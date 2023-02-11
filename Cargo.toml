@@ -1,4 +1,4 @@
 [workspace]
 members = [
-    "yake_wasm"
+    "yake_rust"
 ]

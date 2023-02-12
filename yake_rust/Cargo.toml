@@ -1,6 +1,6 @@
 [package]
 name = "yake-rust"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ["Kyle Fahey <kyle.c.r.fahey@gmail.com>"]
 keywords = ["keyword", "nlp", "keywords", "extractor"]
@@ -18,8 +18,6 @@ unicode-segmentation = "1.9.0"
 natural = "0.3.0"
 
 [lib]
-crate-type = ["cdylib"]
-bench = false
 path = "src/lib.rs" 
 
 [profile.dev]

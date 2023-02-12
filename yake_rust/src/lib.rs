@@ -1,11 +1,7 @@
-
-extern crate wee_alloc;
 use std::collections::{HashMap, HashSet};
 use std::cmp::{min, max};
 use std::iter::FromIterator;
 use stats::{stddev, mean, median};
-use serde::{Serialize, Deserialize};
-use wasm_bindgen::prelude::*;
 
 mod levenshtein;
 mod preprocessor;
@@ -19,19 +15,12 @@ type Contexts = HashMap<String, (Vec<String>, Vec<String>)>;
 type Results = Vec<ResultItem>;
 type DedupeSubgram = HashMap<String, bool>;
 
-extern crate web_sys;
-
 // A macro to provide `println!(..)`-style syntax for `console.log` logging.
 macro_rules! log {
     ( $( $t:tt )* ) => {
         web_sys::console::log_1(&format!( $( $t )* ).into());
     }
 }
-
-
-// Use `wee_alloc` as the global allocator.
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 struct Occurrence {
@@ -60,8 +49,7 @@ struct YakeCandidate {
     
 }
 
-#[wasm_bindgen]
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct ResultItem {
     raw: String,
     keyword: String,
@@ -116,16 +104,13 @@ struct Config {
 }
 
 
-#[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct Yake {
     config: Config,
 }
 
 
-#[wasm_bindgen]
 impl Yake {
-    #[wasm_bindgen(constructor)]
     pub fn new(ngram: Option<usize>, remove_duplicates: Option<bool>) -> Yake {
         let default_stopwords = stopwords::StopWords::new().words;
         let default_punctuation = HashSet::from_iter( vec!["!", "\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", ":", ",", "<", "=", ">", "?", "@", "[", "\\", "]", "^", "_", "`", "{", "|", "}", "~"].iter().map(|&s| s.to_string()));
@@ -143,7 +128,7 @@ impl Yake {
         }
     }
 
-    pub fn get_n_best(&mut self, text: String, n: Option<usize>) -> Result<JsValue, JsValue> {
+    pub fn get_n_best(&mut self, text: String, n: Option<usize>) -> Vec<ResultItem> {
         let default_n = n.unwrap_or(10);
         let sentences = self.build_text(text);
         let selected_ngrams = self.ngram_selection(self.config.ngram, sentences);
@@ -172,9 +157,7 @@ impl Yake {
             results_vec = non_redundant_best;
         }
 
-        let sorted_results = results_vec.iter().take(min(default_n, results_vec.len())).map(|x| ResultItem { raw: x.raw.to_owned(), keyword: x.keyword.to_owned(), score: x.score }).collect::<Vec<ResultItem>>();
-
-        Ok(serde_wasm_bindgen::to_value(&sorted_results)?)
+        results_vec.iter().take(min(default_n, results_vec.len())).map(|x| ResultItem { raw: x.raw.to_owned(), keyword: x.keyword.to_owned(), score: x.score }).collect::<Vec<ResultItem>>()
     }
     
 
@@ -500,12 +483,8 @@ impl Yake {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
-    use wasm_bindgen_test::wasm_bindgen_test;
 
     use crate::{Results, ResultItem};
-
-    #[wasm_bindgen_test]
     fn keywords() {
         let text = r#"
         Google is acquiring data science community Kaggle. Sources tell us that Google is acquiring Kaggle, a platform that hosts data science and machine learning 
@@ -533,7 +512,6 @@ mod tests {
         "#;
     
         let kwds = super::Yake::new(None, None).get_n_best(text.to_string(), Some(10));
-        let value = serde_wasm_bindgen::from_value::<Results>(kwds.unwrap());
         let results: Results = vec![
             ResultItem{
                 raw: "Kaggle".to_owned(),
@@ -587,8 +565,7 @@ mod tests {
               }
         ];
 
-        log!("{:?}", json!(results).to_string());
-        assert_eq!(value.unwrap(), results);
+        assert_eq!(kwds, results);
     }
 
 }

@@ -12,15 +12,11 @@ type Candidates = HashMap<String, PreCandidate>;
 type Features =  HashMap<String, YakeCandidate>;
 type Words = HashMap<String, Vec<Occurrence>>;
 type Contexts = HashMap<String, (Vec<String>, Vec<String>)>;
-type Results = Vec<ResultItem>;
 type DedupeSubgram = HashMap<String, bool>;
 
-// A macro to provide `println!(..)`-style syntax for `console.log` logging.
-macro_rules! log {
-    ( $( $t:tt )* ) => {
-        web_sys::console::log_1(&format!( $( $t )* ).into());
-    }
-}
+
+
+
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 struct Occurrence {
@@ -483,8 +479,9 @@ impl Yake {
 
 #[cfg(test)]
 mod tests {
+    type Results = Vec<ResultItem>;
+    use crate::ResultItem;
 
-    use crate::{Results, ResultItem};
     fn keywords() {
         let text = r#"
         Google is acquiring data science community Kaggle. Sources tell us that Google is acquiring Kaggle, a platform that hosts data science and machine learning 

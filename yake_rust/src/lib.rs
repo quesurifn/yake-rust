@@ -1,7 +1,11 @@
+
+extern crate wee_alloc;
 use std::collections::{HashMap, HashSet};
 use std::cmp::{min, max};
 use std::iter::FromIterator;
 use stats::{stddev, mean, median};
+use serde::{Serialize, Deserialize};
+use wasm_bindgen::prelude::*;
 
 mod levenshtein;
 mod preprocessor;
@@ -12,7 +16,22 @@ type Candidates = HashMap<String, PreCandidate>;
 type Features =  HashMap<String, YakeCandidate>;
 type Words = HashMap<String, Vec<Occurrence>>;
 type Contexts = HashMap<String, (Vec<String>, Vec<String>)>;
+type Results = Vec<ResultItem>;
+type DedupeSubgram = HashMap<String, bool>;
 
+extern crate web_sys;
+
+// A macro to provide `println!(..)`-style syntax for `console.log` logging.
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
+
+
+// Use `wee_alloc` as the global allocator.
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 struct Occurrence {
@@ -41,7 +60,8 @@ struct YakeCandidate {
     
 }
 
-#[derive(Debug, Clone)]
+#[wasm_bindgen]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct ResultItem {
     raw: String,
     keyword: String,
@@ -83,6 +103,8 @@ struct PreCandidate {
     pub sentence_ids: Vec<usize>,
 }
 
+
+#[derive(Debug, Clone)]
 struct Config {
     pub ngram: usize,
     pub punctuation: HashSet<String>,
@@ -93,15 +115,22 @@ struct Config {
     dedupe_lim: f64,
 }
 
+
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
 pub struct Yake {
-    config : Config,
+    config: Config,
 }
+
+
+#[wasm_bindgen]
 impl Yake {
-    pub fn new(ngram: Option<usize>, remove_duplicaes: Option<bool>, punctuation: Option<HashSet<String>>, stopwords: Option<HashSet<String>>) -> Yake {
-        let default_stopwords = stopwords.unwrap_or(stopwords::StopWords::new().words);
-        let default_punctuation = punctuation.unwrap_or(HashSet::from_iter( vec!["!", "\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", ":", ",", "<", "=", ">", "?", "@", "[", "\\", "]", "^", "_", "`", "{", "|", "}", "~"].iter().map(|&s| s.to_string())));
+    #[wasm_bindgen(constructor)]
+    pub fn new(ngram: Option<usize>, remove_duplicates: Option<bool>) -> Yake {
+        let default_stopwords = stopwords::StopWords::new().words;
+        let default_punctuation = HashSet::from_iter( vec!["!", "\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", ":", ",", "<", "=", ">", "?", "@", "[", "\\", "]", "^", "_", "`", "{", "|", "}", "~"].iter().map(|&s| s.to_string()));
         let default_ngram = ngram.unwrap_or(3);
-        let default_remove_duplicates = remove_duplicaes.unwrap_or(true);
+        let default_remove_duplicates = remove_duplicates.unwrap_or(true);
         Yake {
             config: Config {
                 window_size: 2,
@@ -114,7 +143,7 @@ impl Yake {
         }
     }
 
-    pub fn get_n_best(&mut self, text: String, n: Option<usize>) -> Vec<ResultItem>{
+    pub fn get_n_best(&mut self, text: String, n: Option<usize>) -> Result<JsValue, JsValue> {
         let default_n = n.unwrap_or(10);
         let sentences = self.build_text(text);
         let selected_ngrams = self.ngram_selection(self.config.ngram, sentences);
@@ -123,9 +152,9 @@ impl Yake {
         let built_words = self.vocabulary_building(selected_ngrams.1);
         let built_contexts = self.context_building(built_words.0, built_words.1);
         let built_features = self.feature_extraction(built_contexts.0, built_contexts.1, built_contexts.2);
-        let weighted_candidates = self.candidate_weighting(built_features.0, built_features.1, selected_candidates);
+        let weighted_candidates = self.candidate_weighting(built_features.0, built_features.1, selected_candidates.0, selected_candidates.1);
 
-        let mut results_vec = weighted_candidates.0.clone().iter().map(|(k, v)| ResultItem::new(weighted_candidates.1.get(k).unwrap().to_string(),   k.to_string(), *v)).collect::<Vec<ResultItem>>();
+        let mut results_vec = weighted_candidates.0.clone().iter().map(|(k, v)| ResultItem::new(weighted_candidates.4.get(&k.to_string()).unwrap().to_string(),   k.to_string(), *v)).collect::<Vec<ResultItem>>();
         results_vec.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
 
         if self.config.remove_duplicates {
@@ -143,7 +172,9 @@ impl Yake {
             results_vec = non_redundant_best;
         }
 
-        results_vec.iter().take(min(default_n, results_vec.len())).map(|x| ResultItem { raw: x.raw.to_owned(), keyword: x.keyword.to_owned(), score: x.score }).collect::<Vec<ResultItem>>()
+        let sorted_results = results_vec.iter().take(min(default_n, results_vec.len())).map(|x| ResultItem { raw: x.raw.to_owned(), keyword: x.keyword.to_owned(), score: x.score }).collect::<Vec<ResultItem>>();
+
+        Ok(serde_wasm_bindgen::to_value(&sorted_results)?)
     }
     
 
@@ -159,7 +190,8 @@ impl Yake {
         sentences
     }
 
-    fn candidate_selection(&mut self, mut candidates: HashMap<String, PreCandidate>) -> HashMap<String, PreCandidate> {
+    fn candidate_selection(&mut self, mut candidates: HashMap<String, PreCandidate>) -> (HashMap<String, PreCandidate>, HashMap<String, bool>) {
+        let mut dedupe_subgrams = HashMap::<String, bool>::new();
         for (k, v) in candidates.clone() {
             if  self.config.stopwords.contains(&v.surface_forms[0][0].to_lowercase()) ||
                 self.config.stopwords.contains(&v.surface_forms[0].last().unwrap().to_lowercase()) || 
@@ -168,8 +200,14 @@ impl Yake {
             {
                 candidates.remove(&k);
             }
+            if v.surface_forms[0].len() > 1 {
+                for sf in v.surface_forms[0].clone() {
+                    dedupe_subgrams.insert(sf.to_string().to_lowercase(), true);
+                }
+            }
         }
-        candidates
+
+        (candidates, dedupe_subgrams)
     }
 
     fn vocabulary_building(&mut self, sentences: Vec<Sentence>) -> (Words, Sentences) {
@@ -303,14 +341,14 @@ impl Yake {
             features.insert(key.to_string(), cand);
         }
 
-
-
         (features, contexts, words, sentences )
     }
 
-    fn candidate_weighting(&mut self, features: Features, contexts: Contexts, candidates: Candidates) -> (HashMap<String, f64>,  HashMap<String, String>, HashMap<String, (Vec<String>, Vec<String>)>, HashMap<String, PreCandidate>) {
+    fn candidate_weighting(&mut self, features: Features, contexts: Contexts, candidates: Candidates, dedupe_subgram: DedupeSubgram) -> (HashMap<String, f64>,  HashMap<String, String>, HashMap<String, (Vec<String>, Vec<String>)>, HashMap<String, PreCandidate>, HashMap<String,String>) {
         let mut final_weights = HashMap::<String, f64>::new();
         let mut surface_to_lexical = HashMap::<String, String>::new();
+        let mut raw_lookup = HashMap::<String, String>::new();
+
         for (_k, v) in candidates.clone() {
                 let lowercase_forms = v.surface_forms.iter().map(|w| w.join(" ").to_lowercase());
                 for (idx, candidate) in lowercase_forms.clone().enumerate() {
@@ -318,6 +356,12 @@ impl Yake {
                     let tokens = v.surface_forms[idx].iter().clone().map(|w| w.to_lowercase());
                     let mut prod_ = 1.0;
                     let mut sum_ = 0.0;
+
+                    // Dedup Subgram; Penalize subgrams
+                    if dedupe_subgram.contains_key(&candidate) {
+                        prod_ += 5.0;
+                    }
+
                     for (j, token) in tokens.clone().enumerate() {
                         let cand_value = match features.get_key_value(&token) {
                             Some(b) => b,
@@ -347,15 +391,16 @@ impl Yake {
                     if sum_ == -1.0 {
                         sum_ = 0.999999999;
                     }
-
                     let weight = prod_ / tf * (1.0 + sum_);
 
+                  
                     final_weights.insert(candidate.to_string(), weight);
                     surface_to_lexical.insert(candidate.to_string(), v.lexical_form.join(" "));
+                    raw_lookup.insert(candidate.to_string(), v.surface_forms[0].join(" ").clone());
                 } 
         }
 
-        (final_weights, surface_to_lexical, contexts, candidates)
+        (final_weights, surface_to_lexical, contexts, candidates, raw_lookup)
     }
 
     fn is_redundant(&mut self, cand: String, prev: Vec<String>) -> bool {
@@ -367,7 +412,7 @@ impl Yake {
         }
 
         false
-    } 
+    }
 
     fn is_alphanum(&mut self, mut word: String, valid_punctuation_marks: Option<String>) -> bool {
         let default_valid_punctuation_marks = valid_punctuation_marks.unwrap_or("-".to_owned());
@@ -448,10 +493,102 @@ impl Yake {
                 }
             }
         }
-
-        
-
         (candidates, sentences)
     }
     
-} 
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    use crate::{Results, ResultItem};
+
+    #[wasm_bindgen_test]
+    fn keywords() {
+        let text = r#"
+        Google is acquiring data science community Kaggle. Sources tell us that Google is acquiring Kaggle, a platform that hosts data science and machine learning 
+        competitions. Details about the transaction remain somewhat vague, but given that Google is hosting its Cloud 
+        Next conference in San Francisco this week, the official announcement could come as early as tomorrow. 
+        Reached by phone, Kaggle co-founder CEO Anthony Goldbloom declined to deny that the acquisition is happening. 
+        Google itself declined 'to comment on rumors'. Kaggle, which has about half a million data scientists on its platform, 
+        was founded by Goldbloom  and Ben Hamner in 2010. 
+        The service got an early start and even though it has a few competitors like DrivenData, TopCoder and HackerRank, 
+        it has managed to stay well ahead of them by focusing on its specific niche. 
+        The service is basically the de facto home for running data science and machine learning competitions. 
+        With Kaggle, Google is buying one of the largest and most active communities for data scientists - and with that, 
+        it will get increased mindshare in this community, too (though it already has plenty of that thanks to Tensorflow 
+        and other projects). Kaggle has a bit of a history with Google, too, but that's pretty recent. Earlier this month, 
+        Google and Kaggle teamed up to host a $100,000 machine learning competition around classifying YouTube videos. 
+        That competition had some deep integrations with the Google Cloud Platform, too. Our understanding is that Google 
+        will keep the service running - likely under its current name. While the acquisition is probably more about 
+        Kaggle's community than technology, Kaggle did build some interesting tools for hosting its competition 
+        and 'kernels', too. On Kaggle, kernels are basically the source code for analyzing data sets and developers can 
+        share this code on the platform (the company previously called them 'scripts'). 
+        Like similar competition-centric sites, Kaggle also runs a job board, too. It's unclear what Google will do with 
+        that part of the service. According to Crunchbase, Kaggle raised $12.5 million (though PitchBook says it's $12.75) 
+        since its   launch in 2010. Investors in Kaggle include Index Ventures, SV Angel, Max Levchin, Naval Ravikant,
+        Google chief economist Hal Varian, Khosla Ventures and Yuri Milner 
+        "#;
+    
+        let kwds = super::Yake::new(None, None).get_n_best(text.to_string(), Some(10));
+        let value = serde_wasm_bindgen::from_value::<Results>(kwds.unwrap());
+        let results: Results = vec![
+            ResultItem{
+                raw: "Kaggle".to_owned(),
+                keyword: "kaggle".to_owned(),
+                score: 0.20846279315962324
+              },
+              ResultItem{
+                raw: "Google".to_owned(),
+                keyword: "google".to_owned(),
+                score: 0.23676437642810488
+              },
+              ResultItem{
+                raw: "acquiring Kaggle".to_owned(),
+                keyword: "acquiring kaggle".to_owned(),
+                score: 0.3017882425537463
+              },
+              ResultItem{
+                raw: "data science".to_owned(),
+                keyword: "data science".to_owned(),
+                score: 0.30873986543219967
+              },
+              ResultItem{
+                raw: "Google Cloud".to_owned(),
+                keyword: "google cloud".to_owned(),
+                score: 0.40955463454967833
+              },
+              ResultItem{
+                raw: "Google Cloud Platform".to_owned(),
+                keyword: "google cloud platform".to_owned(),
+                score: 0.5018536215405839
+              },
+              ResultItem{
+                raw: "acquiring data science".to_owned(),
+                keyword: "acquiring data science".to_owned(),
+                score: 0.5494143207629893
+              },
+              ResultItem{
+                raw: "San Francisco".to_owned(),
+                keyword: "san francisco".to_owned(),
+                score: 0.7636151899513093
+              },
+              ResultItem{
+                raw: "CEO Anthony Goldbloom".to_owned(),
+                keyword: "ceo anthony goldbloom".to_owned(),
+                score: 0.8166005339007906
+              },
+              ResultItem{
+                raw: "science community Kaggle".to_owned(),
+                keyword: "science community kaggle".to_owned(),
+                score: 0.8690005548383123
+              }
+        ];
+
+        log!("{:?}", json!(results).to_string());
+        assert_eq!(value.unwrap(), results);
+    }
+
+}

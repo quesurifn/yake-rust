@@ -47,9 +47,9 @@ struct YakeCandidate {
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct ResultItem {
-    raw: String,
-    keyword: String,
-    score: f64,
+    pub raw: String,
+    pub keyword: String,
+    pub score: f64,
 }
 impl ResultItem {
     fn new(raw: String, keyword: String, score: f64) -> ResultItem {

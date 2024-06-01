@@ -1,27 +1,4 @@
-[package]
-name = "yake-rust"
-version = "0.1.1"
-edition = "2021"
-authors = ["Kyle Fahey <kyle.c.r.fahey@gmail.com>"]
-description = "Yake (Yet Another Keyword Extractor) in Rust"
-license = "MIT"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-regex = "1"
-streaming-stats = "0.1.28"
-contractions = "0.5.4"
-unicode-segmentation = "1.9.0"
-natural = "0.3.0"
-
-[lib]
-crate-type = ["cdylib"]
-bench = false
-path = "src/lib.rs" 
-
-[profile.dev]
-opt-level = 0
-
-[profile.release]
-opt-level = 3
+[workspace]
+members = [
+    "yake_rust"
+]

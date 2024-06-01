@@ -1,3 +1,14 @@
+# YAKE (Yet Another Keyword Extractor) RUST
+
+Yake is based on this paper: https://repositorio.inesctec.pt/server/api/core/bitstreams/ef121a01-a0a6-4be8-945d-3324a58fc944/content
+
+Yake is a language agnostic statistical keyword extractor weighing several factors such as acronyms, position in paragraph, capitalization, how many sentences the keyword appears in, stopwords, punctuation and more. 
+
+
+
+## Example 
+
+```rust
 fn main() {
     use std::time::Instant;
     let now = Instant::now();
@@ -32,5 +43,67 @@ fn main() {
     println!("{:?}", kwds);
     let elapsed = now.elapsed();
     println!("Elapsed: {:.2?}", elapsed); 
-
 }
+
+```
+
+Result: 
+
+```json
+[
+  {
+    "keyword": "kaggle",
+    "raw": "Kaggle",
+    "score": 0.20846279315962324
+  },
+  {
+    "keyword": "google",
+    "raw": "Google",
+    "score": 0.23676437642810488
+  },
+  {
+    "keyword": "acquiring kaggle",
+    "raw": "acquiring Kaggle",
+    "score": 0.3017882425537463
+  },
+  {
+    "keyword": "data science",
+    "raw": "data science",
+    "score": 0.30873986543219967
+  },
+  {
+    "keyword": "google cloud",
+    "raw": "Google Cloud",
+    "score": 0.40955463454967833
+  },
+  {
+    "keyword": "google cloud platform",
+    "raw": "Google Cloud Platform",
+    "score": 0.5018536215405839
+  },
+  {
+    "keyword": "acquiring data science",
+    "raw": "acquiring data science",
+    "score": 0.5494143207629893
+  },
+  {
+    "keyword": "san francisco",
+    "raw": "San Francisco",
+    "score": 0.7636151899513093
+  },
+  {
+    "keyword": "ceo anthony goldbloom",
+    "raw": "CEO Anthony Goldbloom",
+    "score": 0.8166005339007906
+  },
+  {
+    "keyword": "science community kaggle",
+    "raw": "science community Kaggle",
+    "score": 0.8690005548383123
+  }
+]
+```
+
+
+
+

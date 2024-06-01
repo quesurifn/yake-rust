@@ -9,6 +9,8 @@ Yake is a language agnostic statistical keyword extractor weighing several facto
 ## Example 
 
 ```rust
+use yake_rust as keywords;
+
 fn main() {
     use std::time::Instant;
     let now = Instant::now();
@@ -38,7 +40,7 @@ fn main() {
     Google chief economist Hal Varian, Khosla Ventures and Yuri Milner 
     "#;
 
-    let kwds = keywords::Yake::new(None, None, None, None).get_n_best(text.to_string(), Some(30));
+    let kwds = keywords::Yake::new(None, None).get_n_best(text.to_string(), Some(30));
 
     println!("{:?}", kwds);
     let elapsed = now.elapsed();

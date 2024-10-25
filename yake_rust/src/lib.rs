@@ -1,10 +1,11 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::type_complexity)]
 
-use stats::{mean, median, stddev};
 use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
+
+use stats::{mean, median, stddev};
 
 mod levenshtein;
 mod preprocessor;
@@ -97,8 +98,8 @@ impl Yake {
         let default_stopwords = stopwords::StopWords::new().words;
         let default_punctuation = HashSet::from_iter(
             vec![
-                "!", "\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", ":", ",", "<", "=", ">", "?", "@", "[", "\\", "]", "^", "_", "`",
-                "{", "|", "}", "~",
+                "!", "\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", ":", ",", "<", "=", ">",
+                "?", "@", "[", "\\", "]", "^", "_", "`", "{", "|", "}", "~",
             ]
             .iter()
             .map(|&s| s.to_string()),
@@ -126,20 +127,26 @@ impl Yake {
         let built_words = self.vocabulary_building(selected_ngrams.1);
         let built_contexts = self.context_building(built_words.0, built_words.1);
         let built_features = self.feature_extraction(built_contexts.0, built_contexts.1, built_contexts.2);
-        let weighted_candidates = self.candidate_weighting(built_features.0, built_features.1, selected_candidates.0, selected_candidates.1);
+        let weighted_candidates =
+            self.candidate_weighting(built_features.0, built_features.1, selected_candidates.0, selected_candidates.1);
 
         let mut results_vec = weighted_candidates
             .0
             .clone()
             .iter()
-            .map(|(k, v)| ResultItem::new(weighted_candidates.4.get(&k.to_string()).unwrap().to_string(), k.to_string(), *v))
+            .map(|(k, v)| {
+                ResultItem::new(weighted_candidates.4.get(&k.to_string()).unwrap().to_string(), k.to_string(), *v)
+            })
             .collect::<Vec<ResultItem>>();
         results_vec.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
 
         if self.config.remove_duplicates {
             let mut non_redundant_best = Vec::<ResultItem>::new();
             for candidate in results_vec {
-                if self.is_redundant(candidate.clone().keyword, non_redundant_best.iter().map(|x| x.keyword.to_string()).collect::<Vec<String>>()) {
+                if self.is_redundant(
+                    candidate.clone().keyword,
+                    non_redundant_best.iter().map(|x| x.keyword.to_string()).collect::<Vec<String>>(),
+                ) {
                     continue;
                 }
                 non_redundant_best.push(candidate);
@@ -170,7 +177,10 @@ impl Yake {
         sentences
     }
 
-    fn candidate_selection(&mut self, mut candidates: HashMap<String, PreCandidate>) -> (HashMap<String, PreCandidate>, HashMap<String, bool>) {
+    fn candidate_selection(
+        &mut self,
+        mut candidates: HashMap<String, PreCandidate>,
+    ) -> (HashMap<String, PreCandidate>, HashMap<String, bool>) {
         let mut dedupe_subgrams = HashMap::<String, bool>::new();
         for (k, v) in candidates.clone() {
             if self.config.stopwords.contains(&v.surface_forms[0][0].to_lowercase())
@@ -197,10 +207,14 @@ impl Yake {
 
             for (w_idx, word) in sentence.words.iter().enumerate() {
                 if self.is_alphanum(word.to_string(), None)
-                    && HashSet::from_iter(word.split("").map(|x| x.to_string())).intersection(&self.config.punctuation).count() == 0
+                    && HashSet::from_iter(word.split("").map(|x| x.to_string()))
+                        .intersection(&self.config.punctuation)
+                        .count()
+                        == 0
                 {
                     let index = word.to_lowercase();
-                    let new_occurrence = Occurrence { shift_offset: shift + w_idx, index: idx, word: word.to_string(), shift };
+                    let new_occurrence =
+                        Occurrence { shift_offset: shift + w_idx, index: idx, word: word.to_string(), shift };
 
                     if let Some(object) = words.get_mut(&index) {
                         object.push(new_occurrence)
@@ -230,9 +244,11 @@ impl Yake {
                 let max_range = buffer.len();
                 let buffered_words = &buffer[min_range..max_range];
                 for w in buffered_words {
-                    let entry_1 = contexts.entry(word.to_string()).or_insert((vec![w.to_string()], Vec::<String>::new()));
+                    let entry_1 =
+                        contexts.entry(word.to_string()).or_insert((vec![w.to_string()], Vec::<String>::new()));
                     entry_1.0.push(w.to_string());
-                    let entry_2 = contexts.entry(w.to_string()).or_insert((Vec::<String>::new(), vec![word.to_string()]));
+                    let entry_2 =
+                        contexts.entry(w.to_string()).or_insert((Vec::<String>::new(), vec![word.to_string()]));
                     entry_2.1.push(word.to_string());
                 }
                 buffer.push(word.to_string());
@@ -242,10 +258,17 @@ impl Yake {
         (contexts, words, sentences)
     }
 
-    fn feature_extraction(&mut self, contexts: Contexts, words: Words, sentences: Sentences) -> (Features, Contexts, Words, Sentences) {
+    fn feature_extraction(
+        &mut self,
+        contexts: Contexts,
+        words: Words,
+        sentences: Sentences,
+    ) -> (Features, Contexts, Words, Sentences) {
         let tf = words.values().map(Vec::len).collect::<Vec<usize>>();
-        let tf_nsw =
-            words.iter().filter_map(|(k, v)| if !self.config.stopwords.contains(&k.to_owned()) { Some(v.len()) } else { None }).collect::<Vec<usize>>();
+        let tf_nsw = words
+            .iter()
+            .filter_map(|(k, v)| if !self.config.stopwords.contains(&k.to_owned()) { Some(v.len()) } else { None })
+            .collect::<Vec<usize>>();
 
         let std_tf = stddev(tf_nsw.iter().map(|x| *x as f64));
         let mean_tf = mean(tf_nsw.iter().map(|x| *x as f64));
@@ -253,13 +276,20 @@ impl Yake {
 
         let mut features = Features::new();
         for (key, word) in &words {
-            let mut cand =
-                YakeCandidate { isstop: self.config.stopwords.contains(key) || key.len() < 3, tf: word.len() as f64, tf_a: 0., tf_u: 0., ..Default::default() };
+            let mut cand = YakeCandidate {
+                isstop: self.config.stopwords.contains(key) || key.len() < 3,
+                tf: word.len() as f64,
+                tf_a: 0.,
+                tf_u: 0.,
+                ..Default::default()
+            };
             for occurrence in word {
                 if occurrence.word.chars().all(|c| c.is_uppercase()) && occurrence.word.len() > 1 {
                     cand.tf_a += 1.0;
                 }
-                if occurrence.word.chars().nth(0).unwrap_or(' ').is_uppercase() && occurrence.shift != occurrence.shift_offset {
+                if occurrence.word.chars().nth(0).unwrap_or(' ').is_uppercase()
+                    && occurrence.shift != occurrence.shift_offset
+                {
                     cand.tf_u += 1.0;
                 }
             }
@@ -297,7 +327,8 @@ impl Yake {
 
             cand.different = sentence_ids.len() as f64;
             cand.different /= sentences.len() as f64;
-            cand.weight = (cand.relatedness * cand.position) / (cand.casing + (cand.frequency / cand.relatedness) + (cand.different / cand.relatedness));
+            cand.weight = (cand.relatedness * cand.position)
+                / (cand.casing + (cand.frequency / cand.relatedness) + (cand.different / cand.relatedness));
 
             features.insert(key.to_string(), cand);
         }
@@ -311,8 +342,13 @@ impl Yake {
         contexts: Contexts,
         candidates: Candidates,
         dedupe_subgram: DedupeSubgram,
-    ) -> (HashMap<String, f64>, HashMap<String, String>, HashMap<String, (Vec<String>, Vec<String>)>, HashMap<String, PreCandidate>, HashMap<String, String>)
-    {
+    ) -> (
+        HashMap<String, f64>,
+        HashMap<String, String>,
+        HashMap<String, (Vec<String>, Vec<String>)>,
+        HashMap<String, PreCandidate>,
+        HashMap<String, String>,
+    ) {
         let mut final_weights = HashMap::<String, f64>::new();
         let mut surface_to_lexical = HashMap::<String, String>::new();
         let mut raw_lookup = HashMap::<String, String>::new();
@@ -341,13 +377,15 @@ impl Yake {
                         let mut prob_t2 = 0.0;
                         if j - 1 > 0 {
                             let term_left = tokens.clone().nth(j - 1).unwrap();
-                            prob_t1 =
-                                contexts.get(&term_left).unwrap().1.iter().filter(|w| **w == term_stop).count() as f64 / features.get(&term_left).unwrap().tf;
+                            prob_t1 = contexts.get(&term_left).unwrap().1.iter().filter(|w| **w == term_stop).count()
+                                as f64
+                                / features.get(&term_left).unwrap().tf;
                         }
                         if j + 1 < tokens.len() {
                             let term_right = tokens.clone().nth(j + 1).unwrap();
-                            prob_t2 =
-                                contexts.get(&term_stop).unwrap().0.iter().filter(|w| **w == term_right).count() as f64 / features.get(&term_right).unwrap().tf;
+                            prob_t2 = contexts.get(&term_stop).unwrap().0.iter().filter(|w| **w == term_right).count()
+                                as f64
+                                / features.get(&term_right).unwrap().tf;
                         }
 
                         let prob = prob_t1 * prob_t2;
@@ -415,10 +453,13 @@ impl Yake {
             if words.clone().iter().any(|w| w.parse::<f64>().is_ok()) {
                 candidates.remove_entry(&k);
             }
-            if words.clone().iter().any(|w| HashSet::from_iter(vec![w.to_owned()]).is_subset(&self.config.punctuation)) {
+            if words.clone().iter().any(|w| HashSet::from_iter(vec![w.to_owned()]).is_subset(&self.config.punctuation))
+            {
                 candidates.remove_entry(&k);
             }
-            if words.clone().iter().map(|w| w.to_owned()).collect::<Vec<String>>().join("").len() < default_minimum_length {
+            if words.clone().iter().map(|w| w.to_owned()).collect::<Vec<String>>().join("").len()
+                < default_minimum_length
+            {
                 candidates.remove_entry(&k);
             };
             if words.clone().iter().map(|w| w.len()).min().unwrap() < default_minimum_word_size {
@@ -429,7 +470,10 @@ impl Yake {
             }
             if default_only_alphanum
                 && candidates.contains_key(&k)
-                && words.clone().iter().any(|w| !self.is_alphanum(w.to_owned(), Some(default_valid_punctuation_marks.to_owned())))
+                && words
+                    .clone()
+                    .iter()
+                    .any(|w| !self.is_alphanum(w.to_owned(), Some(default_valid_punctuation_marks.to_owned())))
             {
                 candidates.remove_entry(&k);
             }
@@ -455,7 +499,12 @@ impl Yake {
                     if candidate.is_none() {
                         candidates.insert(
                             lexical_form.clone(),
-                            PreCandidate { lexical_form: stems, surface_forms: vec![words], sentence_ids: vec![sentence_id], offsets: vec![offset] },
+                            PreCandidate {
+                                lexical_form: stems,
+                                surface_forms: vec![words],
+                                sentence_ids: vec![sentence_id],
+                                offsets: vec![offset],
+                            },
                         );
                     } else {
                         let candidate = candidate.unwrap();
@@ -514,11 +563,27 @@ mod tests {
             ResultItem { raw: "acquiring Kaggle".to_owned(), keyword: "acquiring kaggle".to_owned(), score: 0.3017 },
             ResultItem { raw: "data science".to_owned(), keyword: "data science".to_owned(), score: 0.3087 },
             ResultItem { raw: "Google Cloud".to_owned(), keyword: "google cloud".to_owned(), score: 0.4095 },
-            ResultItem { raw: "Google Cloud Platform".to_owned(), keyword: "google cloud platform".to_owned(), score: 0.5018 },
-            ResultItem { raw: "acquiring data science".to_owned(), keyword: "acquiring data science".to_owned(), score: 0.5494 },
+            ResultItem {
+                raw: "Google Cloud Platform".to_owned(),
+                keyword: "google cloud platform".to_owned(),
+                score: 0.5018,
+            },
+            ResultItem {
+                raw: "acquiring data science".to_owned(),
+                keyword: "acquiring data science".to_owned(),
+                score: 0.5494,
+            },
             ResultItem { raw: "San Francisco".to_owned(), keyword: "san francisco".to_owned(), score: 0.7636 },
-            ResultItem { raw: "CEO Anthony Goldbloom".to_owned(), keyword: "ceo anthony goldbloom".to_owned(), score: 0.8166 },
-            ResultItem { raw: "science community Kaggle".to_owned(), keyword: "science community kaggle".to_owned(), score: 0.8690 },
+            ResultItem {
+                raw: "CEO Anthony Goldbloom".to_owned(),
+                keyword: "ceo anthony goldbloom".to_owned(),
+                score: 0.8166,
+            },
+            ResultItem {
+                raw: "science community Kaggle".to_owned(),
+                keyword: "science community kaggle".to_owned(),
+                score: 0.8690,
+            },
         ];
 
         assert_eq!(kwds, results);

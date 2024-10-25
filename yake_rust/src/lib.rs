@@ -1,3 +1,6 @@
+#![allow(clippy::len_zero)]
+#![allow(clippy::type_complexity)]
+
 use stats::{mean, median, stddev};
 use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
@@ -61,8 +64,7 @@ struct Sentence {
 impl Sentence {
     pub fn new(words: Vec<String>, stems: Option<Vec<String>>) -> Sentence {
         let length = words.len();
-        let default_stems = stems.unwrap_or(Vec::<String>::new());
-        Sentence { words, length, stems: default_stems }
+        Sentence { words, length, stems: stems.unwrap_or_default() }
     }
 }
 
@@ -200,9 +202,8 @@ impl Yake {
                     let index = word.to_lowercase();
                     let new_occurrence = Occurrence { shift_offset: shift + w_idx, index: idx, word: word.to_string(), shift };
 
-                    let object = words.get_mut(&index);
-                    if object != None {
-                        object.unwrap().push(new_occurrence)
+                    if let Some(object) = words.get_mut(&index) {
+                        object.push(new_occurrence)
                     } else {
                         words.insert(index, vec![new_occurrence]);
                     }
@@ -219,15 +220,15 @@ impl Yake {
         for sentence in cloned_sentences {
             let words = sentence.words.iter().map(|w| w.to_lowercase()).collect::<Vec<String>>();
             let mut buffer = Vec::<String>::new();
-            for (_j, word) in words.iter().enumerate() {
+            for word in words.iter() {
                 if !words.contains(word) {
                     buffer.clear();
                     continue;
                 }
 
-                let min_range = max(0 as i32, buffer.len() as i32 - self.config.window_size as i32);
+                let min_range = max(0, buffer.len() as i32 - self.config.window_size as i32) as usize;
                 let max_range = buffer.len();
-                let buffered_words = &buffer[(min_range as usize)..max_range as usize];
+                let buffered_words = &buffer[min_range..max_range];
                 for w in buffered_words {
                     let entry_1 = contexts.entry(word.to_string()).or_insert((vec![w.to_string()], Vec::<String>::new()));
                     entry_1.0.push(w.to_string());
@@ -242,7 +243,7 @@ impl Yake {
     }
 
     fn feature_extraction(&mut self, contexts: Contexts, words: Words, sentences: Sentences) -> (Features, Contexts, Words, Sentences) {
-        let tf = words.iter().map(|(_k, v)| v.len()).collect::<Vec<usize>>();
+        let tf = words.values().map(Vec::len).collect::<Vec<usize>>();
         let tf_nsw =
             words.iter().filter_map(|(k, v)| if !self.config.stopwords.contains(&k.to_owned()) { Some(v.len()) } else { None }).collect::<Vec<usize>>();
 
@@ -251,13 +252,10 @@ impl Yake {
         let max_tf = *tf.iter().max().unwrap() as f64;
 
         let mut features = Features::new();
-        for (key, ref word) in &words {
-            let mut cand = YakeCandidate::default();
-            cand.isstop = self.config.stopwords.contains(key) || key.len() < 3;
-            cand.tf = word.len() as f64;
-            cand.tf_a = 0.0;
-            cand.tf_u = 0.0;
-            for occurrence in word.clone() {
+        for (key, word) in &words {
+            let mut cand =
+                YakeCandidate { isstop: self.config.stopwords.contains(key) || key.len() < 3, tf: word.len() as f64, tf_a: 0., tf_u: 0., ..Default::default() };
+            for occurrence in word {
                 if occurrence.word.chars().all(|c| c.is_uppercase()) && occurrence.word.len() > 1 {
                     cand.tf_a += 1.0;
                 }
@@ -270,7 +268,7 @@ impl Yake {
             cand.casing /= 1.0 + cand.tf.ln_1p();
 
             let sentence_ids = word.iter().map(|o| o.index).collect::<HashSet<usize>>();
-            cand.position = (3.0 + median(sentence_ids.iter().map(|x| *x)).unwrap()).ln();
+            cand.position = (3.0 + median(sentence_ids.iter().copied()).unwrap()).ln();
             cand.position = cand.position.ln();
 
             cand.frequency = cand.tf;
@@ -429,10 +427,11 @@ impl Yake {
             if v.lexical_form.len() > default_maximum_word_number {
                 candidates.remove_entry(&k);
             }
-            if default_only_alphanum && candidates.contains_key(&k) {
-                if words.clone().iter().any(|w| !self.is_alphanum(w.to_owned(), Some(default_valid_punctuation_marks.to_owned()))) {
-                    candidates.remove_entry(&k);
-                }
+            if default_only_alphanum
+                && candidates.contains_key(&k)
+                && words.clone().iter().any(|w| !self.is_alphanum(w.to_owned(), Some(default_valid_punctuation_marks.to_owned())))
+            {
+                candidates.remove_entry(&k);
             }
         }
 

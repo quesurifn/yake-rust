@@ -1,16 +1,18 @@
 use unicode_segmentation::UnicodeSegmentation;
 
+#[allow(dead_code)]
 pub struct Preprocessor {
     pub text: String,
+    #[deprecated = "not implemented yet"]
     pub ignore_urls: bool,
+    #[deprecated = "not implemented yet"]
     pub expand_contractions: bool,
 }
 
 impl Preprocessor {
     pub fn new(text: String, ignore_urls: Option<bool>, expand_contractions: Option<bool>) -> Preprocessor {
-        let default_ignore_urls = ignore_urls.unwrap_or(true);
-        let default_expand_contractions = expand_contractions.unwrap_or(true);
-        Preprocessor { text, ignore_urls: default_ignore_urls, expand_contractions: default_expand_contractions }
+        #[allow(deprecated)]
+        Preprocessor { text, ignore_urls: ignore_urls.unwrap_or(true), expand_contractions: expand_contractions.unwrap_or(true) }
     }
 
     pub fn split_into_words(&mut self) -> Vec<String> {

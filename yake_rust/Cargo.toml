@@ -19,7 +19,7 @@ unicode-segmentation = "1.9.0"
 natural = "0.3.0"
 
 [lib]
-path = "src/lib.rs" 
+path = "src/lib.rs"
 
 [profile.dev]
 opt-level = 0

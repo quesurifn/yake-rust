@@ -1,6 +1,6 @@
 [package]
 name = "yake-rust"
-version = "0.1.8"
+version = "0.2.0"
 edition = "2021"
 authors = ["Kyle Fahey <kyle.c.r.fahey@gmail.com>"]
 keywords = ["keyword", "nlp", "keywords", "extractor"]
@@ -13,13 +13,13 @@ license = "MIT"
 
 [dependencies]
 regex = "1"
-streaming-stats = "0.1.28"
+streaming-stats = "0.2.3"
 contractions = "0.5.4"
-unicode-segmentation = "1.9.0"
-natural = "0.3.0"
+unicode-segmentation = "1.12.0"
+levenshtein = "1.0.5"
 
 [lib]
-path = "src/lib.rs" 
+path = "src/lib.rs"
 
 [profile.dev]
 opt-level = 0

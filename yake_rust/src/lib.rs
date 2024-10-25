@@ -7,9 +7,10 @@ use std::iter::FromIterator;
 
 use stats::{mean, median, stddev};
 
+use crate::preprocessor::PreprocessorCfg;
+
 mod levenshtein;
 mod preprocessor;
-mod stopwords;
 
 type Sentences = Vec<Sentence>;
 type Candidates = HashMap<String, PreCandidate>;
@@ -17,6 +18,14 @@ type Features = HashMap<String, YakeCandidate>;
 type Words = HashMap<String, Vec<Occurrence>>;
 type Contexts = HashMap<String, (Vec<String>, Vec<String>)>;
 type DedupeSubgram = HashMap<String, bool>;
+
+struct WeightedCandidates {
+    final_weights: HashMap<String, f64>,
+    surface_to_lexical: HashMap<String, String>,
+    contexts: Contexts,
+    candidates: Candidates,
+    raw_lookup: HashMap<String, String>,
+}
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 struct Occurrence {
@@ -50,6 +59,7 @@ pub struct ResultItem {
     pub keyword: String,
     pub score: f64,
 }
+
 impl ResultItem {
     fn new(raw: String, keyword: String, score: f64) -> ResultItem {
         ResultItem { raw, keyword, score }
@@ -59,13 +69,15 @@ impl ResultItem {
 #[derive(Debug, Clone)]
 struct Sentence {
     pub words: Vec<String>,
+    /// Lowercased.
     pub stems: Vec<String>,
     pub length: usize,
 }
+
 impl Sentence {
-    pub fn new(words: Vec<String>, stems: Option<Vec<String>>) -> Sentence {
+    pub fn new(words: Vec<String>, stems: Vec<String>) -> Sentence {
         let length = words.len();
-        Sentence { words, length, stems: stems.unwrap_or_default() }
+        Sentence { words, length, stems }
     }
 }
 
@@ -78,48 +90,43 @@ struct PreCandidate {
 }
 
 #[derive(Debug, Clone)]
-struct Config {
+pub struct Config {
     pub ngram: usize,
+    /// List of punctuation symbols.
     pub punctuation: HashSet<String>,
-    pub stopwords: HashSet<String>,
+    /// List of lowercased words to be filtered from the text.
+    pub stop_words: HashSet<String>,
     pub remove_duplicates: bool,
-
-    window_size: usize,
-    dedupe_lim: f64,
+    pub window_size: usize,
+    pub dedupe_lim: f64,
 }
 
-#[derive(Debug, Clone)]
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            stop_words: include_str!("stop_words.txt").lines().map(ToOwned::to_owned).collect(),
+            punctuation: r##"!"#$%&'()*+,-./:,<=>?@[\]^_`{|}~"##.chars().map(|ch| ch.to_string()).collect(),
+            window_size: 2,
+            dedupe_lim: 0.8,
+            ngram: 3,
+            remove_duplicates: true,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct Yake {
     config: Config,
 }
 
 impl Yake {
-    pub fn new(ngram: Option<usize>, remove_duplicates: Option<bool>) -> Yake {
-        let default_stopwords = stopwords::StopWords::new().words;
-        let default_punctuation = HashSet::from_iter(
-            vec![
-                "!", "\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", ":", ",", "<", "=", ">",
-                "?", "@", "[", "\\", "]", "^", "_", "`", "{", "|", "}", "~",
-            ]
-            .iter()
-            .map(|&s| s.to_string()),
-        );
-        let default_ngram = ngram.unwrap_or(3);
-        let default_remove_duplicates = remove_duplicates.unwrap_or(true);
-        Yake {
-            config: Config {
-                window_size: 2,
-                ngram: default_ngram,
-                dedupe_lim: 0.8,
-                stopwords: default_stopwords,
-                punctuation: default_punctuation,
-                remove_duplicates: default_remove_duplicates,
-            },
-        }
+    pub fn new(config: Config) -> Yake {
+        Self { config }
     }
 
     pub fn get_n_best(&mut self, text: String, n: Option<usize>) -> Vec<ResultItem> {
-        let default_n = n.unwrap_or(10);
+        let n = n.unwrap_or(10);
+
         let sentences = self.build_text(text);
         let selected_ngrams = self.ngram_selection(self.config.ngram, sentences);
         let filtered_candidates = self.candidate_filtering(selected_ngrams.0, None, None, None, None, None);
@@ -131,13 +138,18 @@ impl Yake {
             self.candidate_weighting(built_features.0, built_features.1, selected_candidates.0, selected_candidates.1);
 
         let mut results_vec = weighted_candidates
-            .0
+            .final_weights
             .clone()
             .iter()
             .map(|(k, v)| {
-                ResultItem::new(weighted_candidates.4.get(&k.to_string()).unwrap().to_string(), k.to_string(), *v)
+                ResultItem::new(
+                    weighted_candidates.raw_lookup.get(&k.to_string()).unwrap().to_string(),
+                    k.to_string(),
+                    *v,
+                )
             })
             .collect::<Vec<ResultItem>>();
+
         results_vec.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
 
         if self.config.remove_duplicates {
@@ -151,7 +163,7 @@ impl Yake {
                 }
                 non_redundant_best.push(candidate);
 
-                if non_redundant_best.len() >= default_n {
+                if non_redundant_best.len() >= n {
                     break;
                 }
             }
@@ -160,31 +172,28 @@ impl Yake {
 
         results_vec
             .iter()
-            .take(min(default_n, results_vec.len()))
+            .take(min(n, results_vec.len()))
             .map(|x| ResultItem { raw: x.raw.to_owned(), keyword: x.keyword.to_owned(), score: x.score })
             .collect::<Vec<ResultItem>>()
     }
 
     fn build_text(&mut self, text: String) -> Sentences {
-        let mut sentences = Vec::<Sentence>::new();
-        let preprocessor = preprocessor::Preprocessor::new(text, None, None).split_into_sentences();
-        for sentence in preprocessor {
-            let words = preprocessor::Preprocessor::new(sentence.to_string(), None, None).split_into_words();
-            let stems = words.iter().map(|w| w.to_lowercase()).collect::<Vec<String>>();
-            let sentence = Sentence::new(words, Some(stems));
-            sentences.push(sentence);
-        }
-        sentences
+        let cfg = PreprocessorCfg::default();
+        preprocessor::split_into_sentences(&text, &cfg)
+            .into_iter()
+            .map(|sentence| {
+                let words = preprocessor::split_into_words(&sentence, &cfg);
+                let stems = words.iter().map(|w| w.to_lowercase()).collect();
+                Sentence::new(words, stems)
+            })
+            .collect()
     }
 
-    fn candidate_selection(
-        &mut self,
-        mut candidates: HashMap<String, PreCandidate>,
-    ) -> (HashMap<String, PreCandidate>, HashMap<String, bool>) {
-        let mut dedupe_subgrams = HashMap::<String, bool>::new();
+    fn candidate_selection(&mut self, mut candidates: Candidates) -> (Candidates, HashMap<String, bool>) {
+        let mut dedupe_subgrams = DedupeSubgram::new();
         for (k, v) in candidates.clone() {
-            if self.config.stopwords.contains(&v.surface_forms[0][0].to_lowercase())
-                || self.config.stopwords.contains(&v.surface_forms[0].last().unwrap().to_lowercase())
+            if self.config.stop_words.contains(&v.surface_forms[0][0].to_lowercase())
+                || self.config.stop_words.contains(&v.surface_forms[0].last().unwrap().to_lowercase())
                 || v.surface_forms[0][0].len() < 3
                 || v.surface_forms[0].last().unwrap().len() < 3
             {
@@ -267,7 +276,7 @@ impl Yake {
         let tf = words.values().map(Vec::len).collect::<Vec<usize>>();
         let tf_nsw = words
             .iter()
-            .filter_map(|(k, v)| if !self.config.stopwords.contains(&k.to_owned()) { Some(v.len()) } else { None })
+            .filter_map(|(k, v)| if !self.config.stop_words.contains(&k.to_owned()) { Some(v.len()) } else { None })
             .collect::<Vec<usize>>();
 
         let std_tf = stddev(tf_nsw.iter().map(|x| *x as f64));
@@ -277,7 +286,7 @@ impl Yake {
         let mut features = Features::new();
         for (key, word) in &words {
             let mut cand = YakeCandidate {
-                isstop: self.config.stopwords.contains(key) || key.len() < 3,
+                isstop: self.config.stop_words.contains(key) || key.len() < 3,
                 tf: word.len() as f64,
                 tf_a: 0.,
                 tf_u: 0.,
@@ -342,13 +351,7 @@ impl Yake {
         contexts: Contexts,
         candidates: Candidates,
         dedupe_subgram: DedupeSubgram,
-    ) -> (
-        HashMap<String, f64>,
-        HashMap<String, String>,
-        HashMap<String, (Vec<String>, Vec<String>)>,
-        HashMap<String, PreCandidate>,
-        HashMap<String, String>,
-    ) {
+    ) -> WeightedCandidates {
         let mut final_weights = HashMap::<String, f64>::new();
         let mut surface_to_lexical = HashMap::<String, String>::new();
         let mut raw_lookup = HashMap::<String, String>::new();
@@ -407,10 +410,10 @@ impl Yake {
             }
         }
 
-        (final_weights, surface_to_lexical, contexts, candidates, raw_lookup)
+        WeightedCandidates { final_weights, surface_to_lexical, contexts, candidates, raw_lookup }
     }
 
-    fn is_redundant(&mut self, cand: String, prev: Vec<String>) -> bool {
+    fn is_redundant(&self, cand: String, prev: Vec<String>) -> bool {
         for prev_cand in prev {
             let dist = levenshtein::Levenshtein::ratio(cand.to_owned(), prev_cand);
             if dist > self.config.dedupe_lim {
@@ -421,7 +424,7 @@ impl Yake {
         false
     }
 
-    fn is_alphanum(&mut self, mut word: String, valid_punctuation_marks: Option<String>) -> bool {
+    fn is_alphanum(&self, mut word: String, valid_punctuation_marks: Option<String>) -> bool {
         let default_valid_punctuation_marks = valid_punctuation_marks.unwrap_or("-".to_owned());
         for punct in default_valid_punctuation_marks.split("") {
             word = word.replace(punct, "");
@@ -447,7 +450,7 @@ impl Yake {
         for (k, v) in candidates.clone() {
             //get the words from the first occurring surface form
             let words = HashSet::from_iter(v.surface_forms[0].iter().map(|w| w.to_lowercase()));
-            if words.intersection(&self.config.stopwords).count() > 0 {
+            if words.intersection(&self.config.stop_words).count() > 0 {
                 candidates.remove_entry(&k);
             }
             if words.clone().iter().any(|w| w.parse::<f64>().is_ok()) {
@@ -522,8 +525,8 @@ impl Yake {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     type Results = Vec<ResultItem>;
-    use crate::ResultItem;
 
     #[test]
     fn keywords() {
@@ -552,7 +555,7 @@ mod tests {
         Google chief economist Hal Varian, Khosla Ventures and Yuri Milner
         "#;
 
-        let mut kwds = super::Yake::new(None, None).get_n_best(text.to_string(), Some(10));
+        let mut kwds = Yake::default().get_n_best(text.to_string(), Some(10));
 
         // leave only 4 digits
         kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).trunc() / 10_000.);

@@ -1,6 +1,6 @@
 [package]
 name = "yake-rust"
-version = "0.1.8"
+version = "0.2.0"
 edition = "2021"
 authors = ["Kyle Fahey <kyle.c.r.fahey@gmail.com>"]
 keywords = ["keyword", "nlp", "keywords", "extractor"]

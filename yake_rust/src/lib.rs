@@ -132,7 +132,7 @@ impl Yake {
         let deduped_subgrams = self.candidate_selection(&mut ngrams);
         let vocabulary = self.build_vocabulary(&sentences);
         let context = self.build_context(&sentences);
-        let features = self.extract_features(&context, &vocabulary, &sentences);
+        let features = self.extract_features(&context, vocabulary, &sentences);
         let weighted_candidates = self.candidate_weighting(features, context, ngrams, deduped_subgrams);
 
         let mut results = weighted_candidates
@@ -252,28 +252,31 @@ impl Yake {
         contexts
     }
 
-    fn extract_features<'s>(&self, contexts: &Contexts, words: &Words<'s>, sentences: &'s Sentences) -> Features {
-        let tf = words.values().map(Vec::len).collect::<Vec<usize>>();
+    fn extract_features<'s>(&self, contexts: &Contexts, words: Words<'s>, sentences: &'s Sentences) -> Features {
+        let tf = words.values().map(Vec::len);
         let tf_nsw = words
             .iter()
             .filter_map(|(k, v)| if !self.config.stop_words.contains(&k.to_owned()) { Some(v.len()) } else { None })
-            .collect::<Vec<usize>>();
+            .map(|x| x as f64)
+            .collect::<Vec<_>>();
 
-        let std_tf = stddev(tf_nsw.iter().map(|x| *x as f64));
-        let mean_tf = mean(tf_nsw.iter().map(|x| *x as f64));
-        let max_tf = *tf.iter().max().unwrap() as f64;
+        let std_tf = stddev(tf_nsw.iter().copied());
+        let mean_tf = mean(tf_nsw.iter().copied());
+        let max_tf = tf.max().unwrap() as f64;
 
         let mut features = Features::new();
-        for (key, word) in words.iter() {
+
+        for (key, word) in words.into_iter() {
             let mut cand = YakeCandidate {
-                isstop: self.config.stop_words.contains(key) || key.len() < 3,
+                isstop: self.config.stop_words.contains(&key) || key.len() < 3,
                 tf: word.len() as f64,
                 tf_a: 0.,
                 tf_u: 0.,
                 ..Default::default()
             };
-            for occurrence in word {
-                if occurrence.word.chars().all(|c| c.is_uppercase()) && occurrence.word.len() > 1 {
+
+            for occurrence in word.iter() {
+                if occurrence.word.chars().all(char::is_uppercase) && occurrence.word.len() > 1 {
                     cand.tf_a += 1.0;
                 }
                 if occurrence.word.chars().nth(0).unwrap_or(' ').is_uppercase()
@@ -295,7 +298,7 @@ impl Yake {
 
             cand.wl = 0.0;
 
-            let ctx = contexts.get(key).unwrap();
+            let ctx = contexts.get(&key).unwrap();
             let ctx_1_hash: HashSet<String> = HashSet::from_iter(ctx.clone().0);
             if ctx.0.len() > 0 {
                 cand.wl = ctx_1_hash.len() as f64;
@@ -319,7 +322,7 @@ impl Yake {
             cand.weight = (cand.relatedness * cand.position)
                 / (cand.casing + (cand.frequency / cand.relatedness) + (cand.different / cand.relatedness));
 
-            features.insert(key.to_string(), cand);
+            features.insert(key, cand);
         }
 
         features

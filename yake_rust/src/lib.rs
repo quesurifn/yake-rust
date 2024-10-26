@@ -15,7 +15,7 @@ mod preprocessor;
 type Sentences = Vec<Sentence>;
 type Candidates<'s> = HashMap<String, PreCandidate<'s>>;
 type Features = HashMap<String, YakeCandidate>;
-type Words = HashMap<String, Vec<Occurrence>>;
+type Words<'s> = HashMap<String, Vec<Occurrence<'s>>>;
 type Contexts = HashMap<String, (Vec<String>, Vec<String>)>;
 type DedupeSubgram = HashMap<String, bool>;
 
@@ -27,11 +27,12 @@ struct WeightedCandidates {
 }
 
 #[derive(PartialEq, Eq, Hash, Debug)]
-struct Occurrence {
+struct Occurrence<'sentence> {
     pub shift_offset: usize,
     pub shift: usize,
-    pub index: usize,
-    pub word: String,
+    /// sentence index
+    pub idx: usize,
+    pub word: &'sentence String,
 }
 
 #[derive(Debug, Default)]
@@ -131,7 +132,7 @@ impl Yake {
         self.filter_candidates(&mut selected_ngrams, None, None, None, None);
 
         let selected_candidates = self.candidate_selection(&mut selected_ngrams);
-        let built_words = self.vocabulary_building(&sentences);
+        let built_words = self.build_vocabulary(&sentences);
         let built_contexts = self.context_building(built_words, &sentences);
         let built_features = self.feature_extraction(built_contexts.0, built_contexts.1, &sentences);
         let weighted_candidates =
@@ -211,8 +212,9 @@ impl Yake {
         deduped
     }
 
-    fn vocabulary_building(&self, sentences: &[Sentence]) -> Words {
-        let mut words = HashMap::<String, Vec<Occurrence>>::new();
+    fn build_vocabulary<'s>(&self, sentences: &'s [Sentence]) -> Words<'s> {
+        let mut words = Words::new();
+
         for (idx, sentence) in sentences.iter().enumerate() {
             let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
 
@@ -220,18 +222,12 @@ impl Yake {
                 if word.chars().all(char::is_alphanumeric)
                     && HashSet::from_iter(word.split("").map(|x| x.to_string()))
                         .intersection(&self.config.punctuation)
-                        .count()
-                        == 0
+                        .next()
+                        .is_none()
                 {
                     let index = word.to_lowercase();
-                    let new_occurrence =
-                        Occurrence { shift_offset: shift + w_idx, index: idx, word: word.to_string(), shift };
-
-                    if let Some(object) = words.get_mut(&index) {
-                        object.push(new_occurrence)
-                    } else {
-                        words.insert(index, vec![new_occurrence]);
-                    }
+                    let occurrence = Occurrence { shift_offset: shift + w_idx, idx, word, shift };
+                    words.entry(index).or_default().push(occurrence)
                 }
             }
         }
@@ -239,7 +235,7 @@ impl Yake {
         words
     }
 
-    fn context_building(&self, words: Words, sentences: &Sentences) -> (Contexts, Words) {
+    fn context_building<'s>(&self, words: Words<'s>, sentences: &'s Sentences) -> (Contexts, Words<'s>) {
         let cloned_sentences = sentences.clone();
         let mut contexts = Contexts::new();
         for sentence in cloned_sentences {
@@ -269,12 +265,12 @@ impl Yake {
         (contexts, words)
     }
 
-    fn feature_extraction(
+    fn feature_extraction<'s>(
         &self,
         contexts: Contexts,
-        words: Words,
-        sentences: &Sentences,
-    ) -> (Features, Contexts, Words) {
+        words: Words<'s>,
+        sentences: &'s Sentences,
+    ) -> (Features, Contexts, Words<'s>) {
         let tf = words.values().map(Vec::len).collect::<Vec<usize>>();
         let tf_nsw = words
             .iter()
@@ -308,7 +304,7 @@ impl Yake {
             cand.casing = cand.tf_a.max(cand.tf_u);
             cand.casing /= 1.0 + cand.tf.ln_1p();
 
-            let sentence_ids = word.iter().map(|o| o.index).collect::<HashSet<usize>>();
+            let sentence_ids = word.iter().map(|o| o.idx).collect::<HashSet<usize>>();
             cand.position = (3.0 + median(sentence_ids.iter().copied()).unwrap()).ln();
             cand.position = cand.position.ln();
 

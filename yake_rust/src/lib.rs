@@ -216,7 +216,7 @@ impl Yake {
             let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
 
             for (w_idx, word) in sentence.words.iter().enumerate() {
-                if self.is_alphanum(word.to_string(), None)
+                if word.chars().all(char::is_alphanumeric)
                     && HashSet::from_iter(word.split("").map(|x| x.to_string()))
                         .intersection(&self.config.punctuation)
                         .count()
@@ -423,14 +423,6 @@ impl Yake {
         }
 
         false
-    }
-
-    fn is_alphanum(&self, mut word: String, valid_punctuation_marks: Option<String>) -> bool {
-        let default_valid_punctuation_marks = valid_punctuation_marks.unwrap_or("-".to_owned());
-        for punct in default_valid_punctuation_marks.split("") {
-            word = word.replace(punct, "");
-        }
-        word.chars().all(|c| c.is_alphanumeric())
     }
 
     fn filter_candidates(

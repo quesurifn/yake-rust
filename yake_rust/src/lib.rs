@@ -127,20 +127,18 @@ impl Yake {
     pub fn get_n_best(&mut self, text: String, n: Option<usize>) -> Vec<ResultItem> {
         let n = n.unwrap_or(10);
 
-        let sentences = self.build_text(text);
-        let mut selected_ngrams = self.ngram_selection(self.config.ngram, &sentences);
-        self.filter_candidates(&mut selected_ngrams, None, None, None, None);
+        let sentences = self.prepare_text(text);
+        let mut ngrams = self.ngram_selection(self.config.ngram, &sentences);
+        self.filter_candidates(&mut ngrams, None, None, None, None);
 
-        let selected_candidates = self.candidate_selection(&mut selected_ngrams);
-        let built_words = self.build_vocabulary(&sentences);
-        let built_contexts = self.context_building(built_words, &sentences);
-        let built_features = self.feature_extraction(built_contexts.0, built_contexts.1, &sentences);
-        let weighted_candidates =
-            self.candidate_weighting(built_features.0, built_features.1, selected_ngrams, selected_candidates);
+        let deduped_subgrams = self.candidate_selection(&mut ngrams);
+        let vocabulary = self.build_vocabulary(&sentences);
+        let context = self.build_context(&sentences);
+        let features = self.extract_features(&context, &vocabulary, &sentences);
+        let weighted_candidates = self.candidate_weighting(features, context, ngrams, deduped_subgrams);
 
-        let mut results_vec = weighted_candidates
+        let mut results = weighted_candidates
             .final_weights
-            .clone()
             .iter()
             .map(|(k, v)| {
                 ResultItem::new(
@@ -151,11 +149,11 @@ impl Yake {
             })
             .collect::<Vec<ResultItem>>();
 
-        results_vec.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
+        results.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
 
         if self.config.remove_duplicates {
             let mut non_redundant_best = Vec::<ResultItem>::new();
-            for candidate in results_vec {
+            for candidate in results {
                 if self.is_redundant(
                     candidate.clone().keyword,
                     non_redundant_best.iter().map(|x| x.keyword.to_string()).collect::<Vec<String>>(),
@@ -168,17 +166,17 @@ impl Yake {
                     break;
                 }
             }
-            results_vec = non_redundant_best;
+            results = non_redundant_best;
         }
 
-        results_vec
+        results
             .iter()
-            .take(min(n, results_vec.len()))
+            .take(min(n, results.len()))
             .map(|x| ResultItem { raw: x.raw.to_owned(), keyword: x.keyword.to_owned(), score: x.score })
             .collect::<Vec<ResultItem>>()
     }
 
-    fn build_text(&self, text: String) -> Sentences {
+    fn prepare_text(&self, text: String) -> Sentences {
         let cfg = PreprocessorCfg::default();
         preprocessor::split_into_sentences(&text, &cfg)
             .into_iter()
@@ -232,7 +230,7 @@ impl Yake {
         words
     }
 
-    fn context_building<'s>(&self, words: Words<'s>, sentences: &'s Sentences) -> (Contexts, Words<'s>) {
+    fn build_context<'s>(&self, sentences: &'s Sentences) -> Contexts {
         let cloned_sentences = sentences.clone();
         let mut contexts = Contexts::new();
         for sentence in cloned_sentences {
@@ -259,15 +257,10 @@ impl Yake {
             }
         }
 
-        (contexts, words)
+        contexts
     }
 
-    fn feature_extraction<'s>(
-        &self,
-        contexts: Contexts,
-        words: Words<'s>,
-        sentences: &'s Sentences,
-    ) -> (Features, Contexts, Words<'s>) {
+    fn extract_features<'s>(&self, contexts: &Contexts, words: &Words<'s>, sentences: &'s Sentences) -> Features {
         let tf = words.values().map(Vec::len).collect::<Vec<usize>>();
         let tf_nsw = words
             .iter()
@@ -279,7 +272,7 @@ impl Yake {
         let max_tf = *tf.iter().max().unwrap() as f64;
 
         let mut features = Features::new();
-        for (key, word) in &words {
+        for (key, word) in words.iter() {
             let mut cand = YakeCandidate {
                 isstop: self.config.stop_words.contains(key) || key.len() < 3,
                 tf: word.len() as f64,
@@ -337,7 +330,7 @@ impl Yake {
             features.insert(key.to_string(), cand);
         }
 
-        (features, contexts, words)
+        features
     }
 
     fn candidate_weighting(

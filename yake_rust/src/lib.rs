@@ -128,9 +128,9 @@ impl Yake {
         let n = n.unwrap_or(10);
 
         let sentences = self.build_text(text);
-        let selected_ngrams = self.ngram_selection(self.config.ngram, sentences);
-        let filtered_candidates = self.candidate_filtering(selected_ngrams.0, None, None, None, None, None);
-        let selected_candidates = self.candidate_selection(filtered_candidates);
+        let mut selected_ngrams = self.ngram_selection(self.config.ngram, sentences);
+        self.filter_candidates(&mut selected_ngrams.0, None, None, None, None);
+        let selected_candidates = self.candidate_selection(selected_ngrams.0);
         let built_words = self.vocabulary_building(selected_ngrams.1);
         let built_contexts = self.context_building(built_words.0, built_words.1);
         let built_features = self.feature_extraction(built_contexts.0, built_contexts.1, built_contexts.2);
@@ -432,57 +432,43 @@ impl Yake {
         word.chars().all(|c| c.is_alphanumeric())
     }
 
-    fn candidate_filtering(
+    fn filter_candidates(
         &self,
-        mut candidates: Candidates,
+        candidates: &mut Candidates,
         minimum_length: Option<usize>,
         minimum_word_size: Option<usize>,
-        valid_punctuation_marks: Option<String>,
         maximum_word_number: Option<usize>,
         only_alphanum: Option<bool>,
-    ) -> Candidates {
-        let default_minimum_length = minimum_length.unwrap_or(3);
-        let default_minimum_word_size = minimum_word_size.unwrap_or(2);
-        let default_maximum_word_number = maximum_word_number.unwrap_or(5);
-        let default_only_alphanum = only_alphanum.unwrap_or(false);
-        let default_valid_punctuation_marks = valid_punctuation_marks.unwrap_or("-".to_owned());
+    ) {
+        let minimum_length = minimum_length.unwrap_or(3);
+        let minimum_word_size = minimum_word_size.unwrap_or(2);
+        let maximum_word_number = maximum_word_number.unwrap_or(5);
+        let only_alphanum = only_alphanum.unwrap_or(false); // fixme: replace with a function
 
-        for (k, v) in candidates.clone() {
-            //get the words from the first occurring surface form
-            let words = HashSet::from_iter(v.surface_forms[0].iter().map(|w| w.to_lowercase()));
-            if words.intersection(&self.config.stop_words).count() > 0 {
-                candidates.remove_entry(&k);
-            }
-            if words.clone().iter().any(|w| w.parse::<f64>().is_ok()) {
-                candidates.remove_entry(&k);
-            }
-            if words.clone().iter().any(|w| HashSet::from_iter(vec![w.to_owned()]).is_subset(&self.config.punctuation))
-            {
-                candidates.remove_entry(&k);
-            }
-            if words.clone().iter().map(|w| w.to_owned()).collect::<Vec<String>>().join("").len()
-                < default_minimum_length
-            {
-                candidates.remove_entry(&k);
-            };
-            if words.clone().iter().map(|w| w.len()).min().unwrap() < default_minimum_word_size {
-                candidates.remove_entry(&k);
-            }
-            if v.lexical_form.len() > default_maximum_word_number {
-                candidates.remove_entry(&k);
-            }
-            if default_only_alphanum
-                && candidates.contains_key(&k)
-                && words
-                    .clone()
-                    .iter()
-                    .any(|w| !self.is_alphanum(w.to_owned(), Some(default_valid_punctuation_marks.to_owned())))
-            {
-                candidates.remove_entry(&k);
-            }
-        }
+        let in_char_set = |word: &str| word.chars().all(|ch| ch.is_alphanumeric() || ch == '-');
 
-        candidates
+        // fixme: filter right before inserting into the set
+        candidates.retain(|_k, v| !{
+            // get the words from the first occurring surface form
+            let first_surf_form = &v.surface_forms[0];
+            let words = HashSet::from_iter(first_surf_form.iter().map(|w| w.to_lowercase()));
+
+            let has_float = || words.iter().any(|w| w.parse::<f64>().is_ok());
+            let has_stop_word = || words.intersection(&self.config.stop_words).next().is_some();
+            let has_punctuation = || words.intersection(&self.config.punctuation).next().is_some();
+            let not_enough_symbols = || words.iter().map(|w| w.len()).sum::<usize>() < minimum_length;
+            let has_too_short_word = || words.iter().map(|w| w.len()).min().unwrap_or(0) < minimum_word_size;
+            let has_non_alphanumeric = || only_alphanum && words.iter().any(|w| !in_char_set(w));
+
+            // remove candidate if
+            has_float()
+                || has_stop_word()
+                || has_punctuation()
+                || not_enough_symbols()
+                || has_too_short_word()
+                || v.lexical_form.len() > maximum_word_number
+                || has_non_alphanumeric()
+        });
     }
 
     fn ngram_selection(&self, n: usize, sentences: Sentences) -> (Candidates, Sentences) {

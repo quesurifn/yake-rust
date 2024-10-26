@@ -177,7 +177,7 @@ impl Yake {
             .collect::<Vec<ResultItem>>()
     }
 
-    fn build_text(&mut self, text: String) -> Sentences {
+    fn build_text(&self, text: String) -> Sentences {
         let cfg = PreprocessorCfg::default();
         preprocessor::split_into_sentences(&text, &cfg)
             .into_iter()
@@ -189,7 +189,7 @@ impl Yake {
             .collect()
     }
 
-    fn candidate_selection(&mut self, mut candidates: Candidates) -> (Candidates, HashMap<String, bool>) {
+    fn candidate_selection(&self, mut candidates: Candidates) -> (Candidates, HashMap<String, bool>) {
         let mut dedupe_subgrams = DedupeSubgram::new();
         for (k, v) in candidates.clone() {
             if self.config.stop_words.contains(&v.surface_forms[0][0].to_lowercase())
@@ -209,7 +209,7 @@ impl Yake {
         (candidates, dedupe_subgrams)
     }
 
-    fn vocabulary_building(&mut self, sentences: Vec<Sentence>) -> (Words, Sentences) {
+    fn vocabulary_building(&self, sentences: Vec<Sentence>) -> (Words, Sentences) {
         let mut words = HashMap::<String, Vec<Occurrence>>::new();
         for (idx, sentence) in sentences.clone().iter().enumerate() {
             let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
@@ -237,7 +237,7 @@ impl Yake {
         (words, sentences)
     }
 
-    fn context_building(&mut self, words: Words, sentences: Sentences) -> (Contexts, Words, Sentences) {
+    fn context_building(&self, words: Words, sentences: Sentences) -> (Contexts, Words, Sentences) {
         let cloned_sentences = sentences.clone();
         let mut contexts = Contexts::new();
         for sentence in cloned_sentences {
@@ -268,7 +268,7 @@ impl Yake {
     }
 
     fn feature_extraction(
-        &mut self,
+        &self,
         contexts: Contexts,
         words: Words,
         sentences: Sentences,
@@ -346,7 +346,7 @@ impl Yake {
     }
 
     fn candidate_weighting(
-        &mut self,
+        &self,
         features: Features,
         contexts: Contexts,
         candidates: Candidates,
@@ -433,7 +433,7 @@ impl Yake {
     }
 
     fn candidate_filtering(
-        &mut self,
+        &self,
         mut candidates: Candidates,
         minimum_length: Option<usize>,
         minimum_word_size: Option<usize>,
@@ -485,7 +485,7 @@ impl Yake {
         candidates
     }
 
-    fn ngram_selection(&mut self, n: usize, sentences: Sentences) -> (Candidates, Sentences) {
+    fn ngram_selection(&self, n: usize, sentences: Sentences) -> (Candidates, Sentences) {
         let mut candidates = HashMap::<String, PreCandidate>::new();
         for (idx, sentence) in sentences.iter().enumerate() {
             let skip = min(n, sentence.length);

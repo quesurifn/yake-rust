@@ -1,7 +1,7 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::type_complexity)]
 
-use std::cmp::{max, min};
+use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
@@ -12,18 +12,22 @@ use stats::{mean, median, stddev};
 mod levenshtein;
 mod preprocessor;
 
+/// Lowercased string
+type LString = String;
+
 type Sentences = Vec<Sentence>;
-type Candidates<'s> = HashMap<String, PreCandidate<'s>>;
-type Features = HashMap<String, YakeCandidate>;
-type Words<'s> = HashMap<String, Vec<Occurrence<'s>>>;
-type Contexts = HashMap<String, (Vec<String>, Vec<String>)>;
-type DedupeSubgram = HashMap<String, bool>;
+/// Key is `stems.join(" ")`
+type Candidates<'s> = HashMap<LString, PreCandidate<'s>>;
+type Features = HashMap<LString, YakeCandidate>;
+type Words<'s> = HashMap<LString, Vec<Occurrence<'s>>>;
+type Contexts = HashMap<LString, (Vec<LString>, Vec<LString>)>;
+type DedupeSubgram = HashMap<LString, bool>;
 
 struct WeightedCandidates {
-    final_weights: HashMap<String, f64>,
-    surface_to_lexical: HashMap<String, String>,
+    final_weights: HashMap<LString, f64>,
+    surface_to_lexical: HashMap<LString, String>,
     contexts: Contexts,
-    raw_lookup: HashMap<String, String>,
+    raw_lookup: HashMap<LString, String>,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug)]
@@ -56,15 +60,14 @@ struct YakeCandidate {
 #[derive(PartialEq, Clone, Debug)]
 pub struct ResultItem {
     pub raw: String,
-    pub keyword: String,
+    pub keyword: LString,
     pub score: f64,
 }
 
 #[derive(Debug, Clone)]
 struct Sentence {
     pub words: Vec<String>,
-    /// Lowercased.
-    pub stems: Vec<String>,
+    pub stems: Vec<LString>,
     pub length: usize,
 }
 
@@ -78,7 +81,7 @@ impl Sentence {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct PreCandidate<'sentence> {
     pub surface_forms: Vec<&'sentence [String]>,
-    pub lexical_form: &'sentence [String],
+    pub lexical_form: &'sentence [LString],
     pub offsets: Vec<usize>,
     pub sentence_ids: Vec<usize>,
 }
@@ -89,7 +92,7 @@ pub struct Config {
     /// List of punctuation symbols.
     pub punctuation: HashSet<String>,
     /// List of lowercased words to be filtered from the text.
-    pub stop_words: HashSet<String>,
+    pub stop_words: HashSet<LString>,
     pub window_size: usize,
     pub remove_duplicates: bool,
     /// A threshold in range 0..1.
@@ -224,30 +227,25 @@ impl Yake {
         words
     }
 
-    fn build_context<'s>(&self, sentences: &'s Sentences) -> Contexts {
-        let cloned_sentences = sentences.clone();
+    fn build_context(&self, sentences: &Sentences) -> Contexts {
         let mut contexts = Contexts::new();
-        for sentence in cloned_sentences {
-            let words = sentence.words.iter().map(|w| w.to_lowercase()).collect::<Vec<String>>();
-            let mut buffer = Vec::<String>::new();
-            for word in words.iter() {
-                if !words.contains(word) {
-                    buffer.clear();
-                    continue;
-                }
 
-                let min_range = max(0, buffer.len() as i32 - self.config.window_size as i32) as usize;
+        for sentence in sentences {
+            let mut buffer: Vec<LString> = Vec::new();
+            let snt_words: Vec<LString> = sentence.words.iter().map(|w| w.to_lowercase()).collect();
+
+            for snt_word in snt_words {
+                let min_range = buffer.len().saturating_sub(self.config.window_size);
                 let max_range = buffer.len();
-                let buffered_words = &buffer[min_range..max_range];
-                for w in buffered_words {
-                    let entry_1 =
-                        contexts.entry(word.to_string()).or_insert((vec![w.to_string()], Vec::<String>::new()));
-                    entry_1.0.push(w.to_string());
-                    let entry_2 =
-                        contexts.entry(w.to_string()).or_insert((Vec::<String>::new(), vec![word.to_string()]));
-                    entry_2.1.push(word.to_string());
+
+                for buf_word in &buffer[min_range..max_range] {
+                    let entry_1 = contexts.entry(snt_word.clone()).or_insert((vec![buf_word.clone()], Vec::new()));
+                    entry_1.0.push(buf_word.clone()); // todo: why put there twice?
+
+                    let entry_2 = contexts.entry(buf_word.clone()).or_insert((Vec::new(), vec![snt_word.clone()]));
+                    entry_2.1.push(snt_word.clone()); // todo: why put there twice?
                 }
-                buffer.push(word.to_string());
+                buffer.push(snt_word);
             }
         }
 
@@ -306,7 +304,7 @@ impl Yake {
             cand.pl = ctx_1_hash.len() as f64 / max_tf;
 
             cand.wr = 0.0;
-            let ctx_2_hash: HashSet<String> = HashSet::from_iter(ctx.clone().1);
+            let ctx_2_hash: HashSet<LString> = HashSet::from_iter(ctx.clone().1);
             if ctx.1.len() > 0 {
                 cand.wr = ctx_2_hash.len() as f64;
                 cand.wr /= ctx.1.len() as f64;
@@ -334,12 +332,12 @@ impl Yake {
         candidates: Candidates,
         dedupe_subgram: DedupeSubgram,
     ) -> WeightedCandidates {
-        let mut final_weights = HashMap::<String, f64>::new();
-        let mut surface_to_lexical = HashMap::<String, String>::new();
-        let mut raw_lookup = HashMap::<String, String>::new();
+        let mut final_weights = HashMap::new();
+        let mut surface_to_lexical = HashMap::new();
+        let mut raw_lookup = HashMap::new();
 
         for (_k, v) in candidates.clone() {
-            let lowercase_forms = v.surface_forms.iter().map(|w| w.join(" ").to_lowercase());
+            let lowercase_forms = v.surface_forms.iter().map(|w| w.join(" ").to_lowercase() as LString);
             for (idx, candidate) in lowercase_forms.clone().enumerate() {
                 let tf = lowercase_forms.clone().count() as f64;
                 let tokens = v.surface_forms[idx].iter().clone().map(|w| w.to_lowercase());
@@ -386,9 +384,9 @@ impl Yake {
                 }
                 let weight = prod_ / tf * (1.0 + sum_);
 
-                final_weights.insert(candidate.to_string(), weight);
-                surface_to_lexical.insert(candidate.to_string(), v.lexical_form.join(" "));
-                raw_lookup.insert(candidate.to_string(), v.surface_forms[0].join(" ").clone());
+                final_weights.insert(candidate.clone(), weight);
+                surface_to_lexical.insert(candidate.clone(), v.lexical_form.join(" "));
+                raw_lookup.insert(candidate.clone(), v.surface_forms[0].join(" ").clone());
             }
         }
 

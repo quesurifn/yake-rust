@@ -169,11 +169,8 @@ impl Yake {
             results = non_redundant_best;
         }
 
+        results.truncate(n);
         results
-            .iter()
-            .take(min(n, results.len()))
-            .map(|x| ResultItem { raw: x.raw.to_owned(), keyword: x.keyword.to_owned(), score: x.score })
-            .collect::<Vec<ResultItem>>()
     }
 
     fn prepare_text(&self, text: String) -> Sentences {

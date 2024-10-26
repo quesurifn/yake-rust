@@ -203,10 +203,7 @@ impl Yake {
             let (fst, lst) = (&first_surf_form[0], first_surf_form.last().unwrap());
 
             // remove candidate if
-            fst.len() < 3
-                || lst.len() < 3
-                || self.config.stop_words.contains(&fst.to_lowercase())
-                || self.config.stop_words.contains(&lst.to_lowercase())
+            fst.len() < 3 || lst.len() < 3
         });
 
         deduped

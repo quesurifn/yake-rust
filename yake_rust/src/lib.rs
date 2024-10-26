@@ -60,12 +60,6 @@ pub struct ResultItem {
     pub score: f64,
 }
 
-impl ResultItem {
-    fn new(raw: String, keyword: String, score: f64) -> ResultItem {
-        ResultItem { raw, keyword, score }
-    }
-}
-
 #[derive(Debug, Clone)]
 struct Sentence {
     pub words: Vec<String>,
@@ -140,15 +134,12 @@ impl Yake {
 
         let mut results = weighted_candidates
             .final_weights
-            .iter()
-            .map(|(k, v)| {
-                ResultItem::new(
-                    weighted_candidates.raw_lookup.get(&k.to_string()).unwrap().to_string(),
-                    k.to_string(),
-                    *v,
-                )
+            .into_iter()
+            .map(|(keyword, score)| {
+                let raw = weighted_candidates.raw_lookup.get(&keyword).unwrap().to_string();
+                ResultItem { raw, keyword, score }
             })
-            .collect::<Vec<ResultItem>>();
+            .collect::<Vec<_>>();
 
         results.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
 

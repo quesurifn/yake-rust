@@ -217,7 +217,7 @@ impl Yake {
 
             for (w_idx, word) in sentence.words.iter().enumerate() {
                 if word.chars().all(char::is_alphanumeric)
-                    && HashSet::from_iter(word.split("").map(|x| x.to_string()))
+                    && HashSet::from_iter(word.chars().map(|x| x.to_string()))
                         .intersection(&self.config.punctuation)
                         .next()
                         .is_none()

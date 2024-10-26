@@ -5,9 +5,9 @@ use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
-use stats::{mean, median, stddev};
-
+use crate::levenshtein::levenshtein_ratio;
 use crate::preprocessor::PreprocessorCfg;
+use stats::{mean, median, stddev};
 
 mod levenshtein;
 mod preprocessor;
@@ -96,8 +96,9 @@ pub struct Config {
     pub punctuation: HashSet<String>,
     /// List of lowercased words to be filtered from the text.
     pub stop_words: HashSet<String>,
-    pub remove_duplicates: bool,
     pub window_size: usize,
+    pub remove_duplicates: bool,
+    /// A threshold in range 0..1.
     pub dedupe_lim: f64,
 }
 
@@ -152,25 +153,30 @@ impl Yake {
         results.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
 
         if self.config.remove_duplicates {
-            let mut non_redundant_best = Vec::<ResultItem>::new();
-            for candidate in results {
-                if self.is_redundant(
-                    candidate.clone().keyword,
-                    non_redundant_best.iter().map(|x| x.keyword.to_string()).collect::<Vec<String>>(),
-                ) {
-                    continue;
-                }
-                non_redundant_best.push(candidate);
+            self.remove_duplicates(results, n)
+        } else {
+            results.truncate(n);
+            results
+        }
+    }
 
-                if non_redundant_best.len() >= n {
-                    break;
-                }
+    fn remove_duplicates(&self, results: Vec<ResultItem>, n: usize) -> Vec<ResultItem> {
+        let mut unique: Vec<ResultItem> = Vec::new();
+
+        for res in results {
+            if unique.len() >= n {
+                break;
             }
-            results = non_redundant_best;
+
+            let is_duplicate =
+                unique.iter().any(|it| levenshtein_ratio(&it.keyword, &res.keyword) > self.config.dedupe_lim);
+
+            if !is_duplicate {
+                unique.push(res);
+            }
         }
 
-        results.truncate(n);
-        results
+        unique
     }
 
     fn prepare_text(&self, text: String) -> Sentences {
@@ -396,17 +402,6 @@ impl Yake {
         }
 
         WeightedCandidates { final_weights, surface_to_lexical, contexts, raw_lookup }
-    }
-
-    fn is_redundant(&self, cand: String, prev: Vec<String>) -> bool {
-        for prev_cand in prev {
-            let dist = levenshtein::Levenshtein::ratio(cand.to_owned(), prev_cand);
-            if dist > self.config.dedupe_lim {
-                return true;
-            }
-        }
-
-        false
     }
 
     fn filter_candidates(

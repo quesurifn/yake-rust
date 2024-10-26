@@ -23,7 +23,6 @@ struct WeightedCandidates {
     final_weights: HashMap<String, f64>,
     surface_to_lexical: HashMap<String, String>,
     contexts: Contexts,
-    candidates: Candidates,
     raw_lookup: HashMap<String, String>,
 }
 
@@ -130,12 +129,12 @@ impl Yake {
         let sentences = self.build_text(text);
         let mut selected_ngrams = self.ngram_selection(self.config.ngram, sentences);
         self.filter_candidates(&mut selected_ngrams.0, None, None, None, None);
-        let selected_candidates = self.candidate_selection(selected_ngrams.0);
+        let selected_candidates = self.candidate_selection(&mut selected_ngrams.0);
         let built_words = self.vocabulary_building(selected_ngrams.1);
         let built_contexts = self.context_building(built_words.0, built_words.1);
         let built_features = self.feature_extraction(built_contexts.0, built_contexts.1, built_contexts.2);
         let weighted_candidates =
-            self.candidate_weighting(built_features.0, built_features.1, selected_candidates.0, selected_candidates.1);
+            self.candidate_weighting(built_features.0, built_features.1, selected_ngrams.0, selected_candidates);
 
         let mut results_vec = weighted_candidates
             .final_weights
@@ -189,24 +188,26 @@ impl Yake {
             .collect()
     }
 
-    fn candidate_selection(&self, mut candidates: Candidates) -> (Candidates, HashMap<String, bool>) {
-        let mut dedupe_subgrams = DedupeSubgram::new();
-        for (k, v) in candidates.clone() {
-            if self.config.stop_words.contains(&v.surface_forms[0][0].to_lowercase())
-                || self.config.stop_words.contains(&v.surface_forms[0].last().unwrap().to_lowercase())
-                || v.surface_forms[0][0].len() < 3
-                || v.surface_forms[0].last().unwrap().len() < 3
-            {
-                candidates.remove(&k);
-            }
-            if v.surface_forms[0].len() > 1 {
-                for sf in v.surface_forms[0].clone() {
-                    dedupe_subgrams.insert(sf.to_string().to_lowercase(), true);
-                }
-            }
-        }
+    fn candidate_selection(&self, candidates: &mut Candidates) -> DedupeSubgram {
+        let mut deduped = DedupeSubgram::new();
 
-        (candidates, dedupe_subgrams)
+        candidates.retain(|_k, v| !{
+            let first_surf_form = &v.surface_forms[0];
+
+            if first_surf_form.len() > 1 {
+                deduped.extend(first_surf_form.iter().map(|word| (word.to_lowercase(), true)));
+            }
+
+            let (fst, lst) = (&first_surf_form[0], first_surf_form.last().unwrap());
+
+            // remove candidate if
+            fst.len() < 3
+                || lst.len() < 3
+                || self.config.stop_words.contains(&fst.to_lowercase())
+                || self.config.stop_words.contains(&lst.to_lowercase())
+        });
+
+        deduped
     }
 
     fn vocabulary_building(&self, sentences: Vec<Sentence>) -> (Words, Sentences) {
@@ -410,7 +411,7 @@ impl Yake {
             }
         }
 
-        WeightedCandidates { final_weights, surface_to_lexical, contexts, candidates, raw_lookup }
+        WeightedCandidates { final_weights, surface_to_lexical, contexts, raw_lookup }
     }
 
     fn is_redundant(&self, cand: String, prev: Vec<String>) -> bool {

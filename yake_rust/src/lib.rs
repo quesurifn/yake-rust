@@ -13,7 +13,7 @@ mod levenshtein;
 mod preprocessor;
 
 type Sentences = Vec<Sentence>;
-type Candidates = HashMap<String, PreCandidate>;
+type Candidates<'s> = HashMap<String, PreCandidate<'s>>;
 type Features = HashMap<String, YakeCandidate>;
 type Words = HashMap<String, Vec<Occurrence>>;
 type Contexts = HashMap<String, (Vec<String>, Vec<String>)>;
@@ -80,10 +80,10 @@ impl Sentence {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
-struct PreCandidate {
-    pub surface_forms: Vec<Vec<String>>,
-    pub lexical_form: Vec<String>,
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct PreCandidate<'sentence> {
+    pub surface_forms: Vec<&'sentence [String]>,
+    pub lexical_form: &'sentence [String],
     pub offsets: Vec<usize>,
     pub sentence_ids: Vec<usize>,
 }
@@ -127,14 +127,15 @@ impl Yake {
         let n = n.unwrap_or(10);
 
         let sentences = self.build_text(text);
-        let mut selected_ngrams = self.ngram_selection(self.config.ngram, sentences);
-        self.filter_candidates(&mut selected_ngrams.0, None, None, None, None);
-        let selected_candidates = self.candidate_selection(&mut selected_ngrams.0);
-        let built_words = self.vocabulary_building(selected_ngrams.1);
-        let built_contexts = self.context_building(built_words.0, built_words.1);
-        let built_features = self.feature_extraction(built_contexts.0, built_contexts.1, built_contexts.2);
+        let mut selected_ngrams = self.ngram_selection(self.config.ngram, &sentences);
+        self.filter_candidates(&mut selected_ngrams, None, None, None, None);
+
+        let selected_candidates = self.candidate_selection(&mut selected_ngrams);
+        let built_words = self.vocabulary_building(&sentences);
+        let built_contexts = self.context_building(built_words, &sentences);
+        let built_features = self.feature_extraction(built_contexts.0, built_contexts.1, &sentences);
         let weighted_candidates =
-            self.candidate_weighting(built_features.0, built_features.1, selected_ngrams.0, selected_candidates);
+            self.candidate_weighting(built_features.0, built_features.1, selected_ngrams, selected_candidates);
 
         let mut results_vec = weighted_candidates
             .final_weights
@@ -188,7 +189,7 @@ impl Yake {
             .collect()
     }
 
-    fn candidate_selection(&self, candidates: &mut Candidates) -> DedupeSubgram {
+    fn candidate_selection<'s>(&self, candidates: &mut Candidates<'s>) -> DedupeSubgram {
         let mut deduped = DedupeSubgram::new();
 
         candidates.retain(|_k, v| !{
@@ -210,9 +211,9 @@ impl Yake {
         deduped
     }
 
-    fn vocabulary_building(&self, sentences: Vec<Sentence>) -> (Words, Sentences) {
+    fn vocabulary_building(&self, sentences: &[Sentence]) -> Words {
         let mut words = HashMap::<String, Vec<Occurrence>>::new();
-        for (idx, sentence) in sentences.clone().iter().enumerate() {
+        for (idx, sentence) in sentences.iter().enumerate() {
             let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
 
             for (w_idx, word) in sentence.words.iter().enumerate() {
@@ -235,10 +236,10 @@ impl Yake {
             }
         }
 
-        (words, sentences)
+        words
     }
 
-    fn context_building(&self, words: Words, sentences: Sentences) -> (Contexts, Words, Sentences) {
+    fn context_building(&self, words: Words, sentences: &Sentences) -> (Contexts, Words) {
         let cloned_sentences = sentences.clone();
         let mut contexts = Contexts::new();
         for sentence in cloned_sentences {
@@ -265,15 +266,15 @@ impl Yake {
             }
         }
 
-        (contexts, words, sentences)
+        (contexts, words)
     }
 
     fn feature_extraction(
         &self,
         contexts: Contexts,
         words: Words,
-        sentences: Sentences,
-    ) -> (Features, Contexts, Words, Sentences) {
+        sentences: &Sentences,
+    ) -> (Features, Contexts, Words) {
         let tf = words.values().map(Vec::len).collect::<Vec<usize>>();
         let tf_nsw = words
             .iter()
@@ -343,7 +344,7 @@ impl Yake {
             features.insert(key.to_string(), cand);
         }
 
-        (features, contexts, words, sentences)
+        (features, contexts, words)
     }
 
     fn candidate_weighting(
@@ -443,7 +444,7 @@ impl Yake {
         // fixme: filter right before inserting into the set
         candidates.retain(|_k, v| !{
             // get the words from the first occurring surface form
-            let first_surf_form = &v.surface_forms[0];
+            let first_surf_form = v.surface_forms[0];
             let words = HashSet::from_iter(first_surf_form.iter().map(|w| w.to_lowercase()));
 
             let has_float = || words.iter().any(|w| w.parse::<f64>().is_ok());
@@ -464,41 +465,29 @@ impl Yake {
         });
     }
 
-    fn ngram_selection(&self, n: usize, sentences: Sentences) -> (Candidates, Sentences) {
-        let mut candidates = HashMap::<String, PreCandidate>::new();
+    fn ngram_selection<'s>(&self, n: usize, sentences: &'s Sentences) -> Candidates<'s> {
+        let mut candidates = Candidates::new();
         for (idx, sentence) in sentences.iter().enumerate() {
             let skip = min(n, sentence.length);
             let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
 
             for j in 0..sentence.length {
                 for k in j + 1..min(j + 1 + skip, sentence.length + 1) {
-                    let words = sentence.words[j..k].to_vec();
-                    let stems = sentence.stems[j..k].to_vec();
+                    let words = &sentence.words[j..k];
+                    let stems = &sentence.stems[j..k];
                     let sentence_id = idx;
                     let offset = j + shift;
                     let lexical_form = stems.join(" ");
-                    let candidate = candidates.get_mut(lexical_form.as_str());
-                    if candidate.is_none() {
-                        candidates.insert(
-                            lexical_form.clone(),
-                            PreCandidate {
-                                lexical_form: stems,
-                                surface_forms: vec![words],
-                                sentence_ids: vec![sentence_id],
-                                offsets: vec![offset],
-                            },
-                        );
-                    } else {
-                        let candidate = candidate.unwrap();
-                        candidate.surface_forms.push(words);
-                        candidate.sentence_ids.push(sentence_id);
-                        candidate.offsets.push(offset);
-                        candidate.lexical_form = stems;
-                    }
+
+                    let candidate = candidates.entry(lexical_form).or_default();
+                    candidate.surface_forms.push(words);
+                    candidate.sentence_ids.push(sentence_id);
+                    candidate.offsets.push(offset);
+                    candidate.lexical_form = stems;
                 }
             }
         }
-        (candidates, sentences)
+        candidates
     }
 }
 

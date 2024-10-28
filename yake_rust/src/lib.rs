@@ -339,10 +339,9 @@ impl Yake {
         let mut surface_to_lexical = HashMap::new();
         let mut raw_lookup = HashMap::new();
 
-        for (_k, v) in candidates.clone() {
+        for (_k, v) in candidates {
             let lowercase_forms = v.surface_forms.iter().map(|w| w.join(" ").to_lowercase() as LString);
-            for (idx, candidate) in lowercase_forms.clone().enumerate() {
-                let tf = lowercase_forms.clone().count() as f64;
+            for (idx, candidate) in lowercase_forms.enumerate() {
                 let tokens = v.surface_forms[idx].iter().clone().map(|w| w.to_lowercase());
                 let mut prod_ = 1.0;
                 let mut sum_ = 0.0;
@@ -353,15 +352,12 @@ impl Yake {
                 }
 
                 for (j, token) in tokens.clone().enumerate() {
-                    let cand_value = match features.get_key_value(&token) {
-                        Some(b) => b,
-                        None => continue,
-                    };
-                    if cand_value.1.isstop {
+                    let Some(feat_cand) = features.get(&token) else { continue };
+                    if feat_cand.isstop {
                         let term_stop = token;
                         let mut prob_t1 = 0.0;
                         let mut prob_t2 = 0.0;
-                        if j - 1 > 0 {
+                        if 1 < j {
                             let term_left = tokens.clone().nth(j - 1).unwrap();
                             prob_t1 = contexts.get(&term_left).unwrap().1.iter().filter(|w| **w == term_stop).count()
                                 as f64
@@ -378,13 +374,15 @@ impl Yake {
                         prod_ *= 1.0 + (1.0 - prob);
                         sum_ -= 1.0 - prob;
                     } else {
-                        prod_ *= cand_value.1.weight;
-                        sum_ += cand_value.1.weight;
+                        prod_ *= feat_cand.weight;
+                        sum_ += feat_cand.weight;
                     }
                 }
                 if sum_ == -1.0 {
                     sum_ = 0.999999999;
                 }
+
+                let tf = v.surface_forms.len() as f64;
                 let weight = prod_ / tf * (1.0 + sum_);
 
                 final_weights.insert(candidate.clone(), weight);

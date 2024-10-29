@@ -1,7 +1,3 @@
-group_imports = "StdExternalCrate"
-match_arm_leading_pipes = "Preserve"
-max_width = 120
 tab_spaces = 4
-unstable_features = true # https://reddit.com/r/rust/comments/zh58hm/why_does_cargo_fmt_allow_unstable_options_via_cli/
 use_small_heuristics = "Max"
-wrap_comments = false
+max_width = 160

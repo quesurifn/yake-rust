@@ -211,7 +211,8 @@ impl Yake {
             let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
 
             for (w_idx, word) in sentence.words.iter().enumerate() {
-                if word.chars().all(char::is_alphanumeric)
+                if !word.is_empty()
+                    && word.chars().all(char::is_alphanumeric)
                     && HashSet::from_iter(word.chars().map(|x| x.to_string()))
                         .intersection(&self.config.punctuation)
                         .next()
@@ -497,36 +498,28 @@ mod tests {
         kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).trunc() / 10_000.);
 
         let results: Results = vec![
+            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0484 },
+            ResultItem { raw: "data science".into(), keyword: "data science".into(), score: 0.0588 },
             ResultItem {
-                raw: "CEO Anthony Goldbloom".to_owned(),
-                keyword: "ceo anthony goldbloom".to_owned(),
-                score: 0.0463,
+                raw: "acquiring data science".into(),
+                keyword: "acquiring data science".into(),
+                score: 0.0647,
+            },
+            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0788 },
+            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.0914 },
+            ResultItem {
+                raw: "Anthony Goldbloom declined".into(),
+                keyword: "anthony goldbloom declined".into(),
+                score: 0.0943,
             },
             ResultItem {
-                raw: "Google Cloud Platform".to_owned(),
-                keyword: "google cloud platform".to_owned(),
-                score: 0.0566,
+                raw: "science community Kaggle".into(),
+                keyword: "science community kaggle".into(),
+                score: 0.0993,
             },
-            ResultItem { raw: "data science".to_owned(), keyword: "data science".to_owned(), score: 0.0599 },
-            ResultItem {
-                raw: "acquiring data science".to_owned(),
-                keyword: "acquiring data science".to_owned(),
-                score: 0.0735,
-            },
-            ResultItem {
-                raw: "science community Kaggle".to_owned(),
-                keyword: "science community kaggle".to_owned(),
-                score: 0.0795,
-            },
-            ResultItem { raw: "San Francisco".to_owned(), keyword: "san francisco".to_owned(), score: 0.0909 },
-            ResultItem { raw: "acquiring Kaggle".to_owned(), keyword: "acquiring kaggle".to_owned(), score: 0.0915 },
-            ResultItem {
-                raw: "Anthony Goldbloom declined".to_owned(),
-                keyword: "anthony goldbloom declined".to_owned(),
-                score: 0.0964,
-            },
-            ResultItem { raw: "Google Cloud".to_owned(), keyword: "google cloud".to_owned(), score: 0.0969 },
-            ResultItem { raw: "Kaggle".to_owned(), keyword: "kaggle".to_owned(), score: 0.1167 },
+            ResultItem { raw: "acquiring Kaggle".into(), keyword: "acquiring kaggle".into(), score: 0.1081 },
+            ResultItem { raw: "founder CEO Anthony".into(), keyword: "founder ceo anthony".into(), score: 0.1243 },
+            ResultItem { raw: "CEO Anthony".into(), keyword: "ceo anthony".into(), score: 0.1247 },
         ];
 
         assert_eq!(kwds, results);

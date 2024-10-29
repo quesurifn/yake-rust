@@ -477,7 +477,6 @@ mod tests {
     #[test]
     fn keywords() {
         let text = include_str!("test_google.txt");
-
         let mut kwds = Yake::default().get_n_best(text, Some(10));
 
         // leave only 4 digits
@@ -502,6 +501,48 @@ mod tests {
                 keyword: "machine learning competitions".into(),
                 score: 0.0992,
             },
+        ];
+
+        assert_eq!(kwds, results);
+    }
+
+    #[test]
+    fn short() {
+        let text = "this is a keyword";
+        let mut kwds = Yake::default().get_n_best(text, Some(1));
+        // leave only 4 digits
+        kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let results: Results = vec![ResultItem { raw: "keyword".into(), keyword: "keyword".into(), score: 0.1583 }];
+
+        assert_eq!(kwds, results);
+    }
+
+    #[test]
+    fn medium() {
+        let text = "Do you like headphones? \
+        Starting this Saturday, we will be kicking off a huge sale of headphones! \
+        If you need headphones, we've got you coverered!";
+        let mut kwds = Yake::new(Config { ngram: 1, ..Default::default() }).get_n_best(text, Some(3));
+        // leave only 4 digits
+        kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let results: Results = vec![
+            ResultItem { raw: "headphones".into(), keyword: "headphones".into(), score: 0.1141 },
+            ResultItem { raw: "Saturday".into(), keyword: "saturday".into(), score: 0.2111 },
+            ResultItem { raw: "Starting".into(), keyword: "starting".into(), score: 0.4096 },
+        ];
+
+        assert_eq!(kwds, results);
+    }
+
+    #[test]
+    fn medium_two() {
+        let text = "Do you need an Apple laptop?";
+        let mut kwds = Yake::new(Config { ngram: 1, ..Default::default() }).get_n_best(text, Some(2));
+        // leave only 4 digits
+        kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let results: Results = vec![
+            ResultItem { raw: "Apple".into(), keyword: "apple".into(), score: 0.1448 },
+            ResultItem { raw: "laptop".into(), keyword: "laptop".into(), score: 0.1583 },
         ];
 
         assert_eq!(kwds, results);

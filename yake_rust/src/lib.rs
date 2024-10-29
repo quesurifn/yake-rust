@@ -4,6 +4,7 @@
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
+use std::ops::Deref;
 
 use crate::levenshtein::levenshtein_ratio;
 use crate::preprocessor::PreprocessorCfg;
@@ -307,14 +308,14 @@ impl Yake {
             cand.pr = 0.0;
 
             if let Some(ctx) = contexts.get(&key) {
-                let ctx_1_hash: HashSet<String> = HashSet::from_iter(ctx.clone().0);
+                let ctx_1_hash: HashSet<&str> = HashSet::from_iter(ctx.0.iter().map(Deref::deref));
                 if ctx.0.len() > 0 {
                     cand.wl = ctx_1_hash.len() as f64;
                     cand.wl /= ctx.0.len() as f64;
                 }
                 cand.pl = ctx_1_hash.len() as f64 / max_tf;
 
-                let ctx_2_hash: HashSet<LString> = HashSet::from_iter(ctx.clone().1);
+                let ctx_2_hash: HashSet<&str> = HashSet::from_iter(ctx.1.iter().map(Deref::deref));
                 if ctx.1.len() > 0 {
                     cand.wr = ctx_2_hash.len() as f64;
                     cand.wr /= ctx.1.len() as f64;

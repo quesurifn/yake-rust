@@ -235,6 +235,11 @@ impl Yake {
             let snt_words: Vec<LString> = sentence.words.iter().map(|w| w.to_lowercase()).collect();
 
             for snt_word in snt_words {
+                if HashSet::from_iter(snt_word.chars()).is_subset(&self.config.punctuation) {
+                    buffer.clear();
+                    continue;
+                }
+
                 let min_range = buffer.len().saturating_sub(self.config.window_size);
                 let max_range = buffer.len();
 
@@ -297,22 +302,25 @@ impl Yake {
             cand.frequency /= mean_tf + std_tf;
 
             cand.wl = 0.0;
-
-            let ctx = contexts.get(&key).unwrap();
-            let ctx_1_hash: HashSet<String> = HashSet::from_iter(ctx.clone().0);
-            if ctx.0.len() > 0 {
-                cand.wl = ctx_1_hash.len() as f64;
-                cand.wl /= ctx.0.len() as f64;
-            }
-            cand.pl = ctx_1_hash.len() as f64 / max_tf;
-
+            cand.pl = 0.0;
             cand.wr = 0.0;
-            let ctx_2_hash: HashSet<LString> = HashSet::from_iter(ctx.clone().1);
-            if ctx.1.len() > 0 {
-                cand.wr = ctx_2_hash.len() as f64;
-                cand.wr /= ctx.1.len() as f64;
+            cand.pr = 0.0;
+
+            if let Some(ctx) = contexts.get(&key) {
+                let ctx_1_hash: HashSet<String> = HashSet::from_iter(ctx.clone().0);
+                if ctx.0.len() > 0 {
+                    cand.wl = ctx_1_hash.len() as f64;
+                    cand.wl /= ctx.0.len() as f64;
+                }
+                cand.pl = ctx_1_hash.len() as f64 / max_tf;
+
+                let ctx_2_hash: HashSet<LString> = HashSet::from_iter(ctx.clone().1);
+                if ctx.1.len() > 0 {
+                    cand.wr = ctx_2_hash.len() as f64;
+                    cand.wr /= ctx.1.len() as f64;
+                }
+                cand.pr = ctx_2_hash.len() as f64 / max_tf;
             }
-            cand.pr = ctx_2_hash.len() as f64 / max_tf;
 
             cand.relatedness = 1.0;
             cand.relatedness += (cand.wr + cand.wl) * (cand.tf / max_tf);
@@ -500,26 +508,26 @@ mod tests {
 
         let results: Results = vec![
             ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0484 },
-            ResultItem { raw: "data science".into(), keyword: "data science".into(), score: 0.0588 },
+            ResultItem { raw: "data science".into(), keyword: "data science".into(), score: 0.0581 },
             ResultItem {
                 raw: "acquiring data science".into(),
                 keyword: "acquiring data science".into(),
-                score: 0.0647,
+                score: 0.0638,
             },
-            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0788 },
+            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0808 },
             ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.0914 },
             ResultItem {
                 raw: "Anthony Goldbloom declined".into(),
                 keyword: "anthony goldbloom declined".into(),
-                score: 0.0943,
+                score: 0.0976,
             },
             ResultItem {
                 raw: "science community Kaggle".into(),
                 keyword: "science community kaggle".into(),
-                score: 0.0993,
+                score: 0.1125,
             },
-            ResultItem { raw: "acquiring Kaggle".into(), keyword: "acquiring kaggle".into(), score: 0.1081 },
-            ResultItem { raw: "founder CEO Anthony".into(), keyword: "founder ceo anthony".into(), score: 0.1243 },
+            ResultItem { raw: "founder CEO Anthony".into(), keyword: "founder ceo anthony".into(), score: 0.1163 },
+            ResultItem { raw: "acquiring Kaggle".into(), keyword: "acquiring kaggle".into(), score: 0.1203 },
             ResultItem { raw: "CEO Anthony".into(), keyword: "ceo anthony".into(), score: 0.1247 },
         ];
 

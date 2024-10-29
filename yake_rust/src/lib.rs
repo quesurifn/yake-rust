@@ -90,7 +90,9 @@ struct PreCandidate<'sentence> {
 pub struct Config {
     pub ngram: usize,
     /// List of punctuation symbols.
-    pub punctuation: HashSet<String>,
+    ///
+    /// They are known as _exclude chars_ in the original implementation.
+    pub punctuation: HashSet<char>,
     /// List of lowercased words to be filtered from the text.
     pub stop_words: HashSet<LString>,
     pub window_size: usize,
@@ -103,7 +105,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             stop_words: include_str!("stop_words.txt").lines().map(ToOwned::to_owned).collect(),
-            punctuation: r##"!"#$%&'()*+,-./:,<=>?@[\]^_`{|}~"##.chars().map(|ch| ch.to_string()).collect(),
+            punctuation: r##"!"#$%&'()*+,-./:,<=>?@[\]^_`{|}~"##.chars().collect(),
             window_size: 2,
             dedupe_lim: 0.8,
             ngram: 3,
@@ -213,10 +215,7 @@ impl Yake {
             for (w_idx, word) in sentence.words.iter().enumerate() {
                 if !word.is_empty()
                     && word.chars().all(char::is_alphanumeric)
-                    && HashSet::from_iter(word.chars().map(|x| x.to_string()))
-                        .intersection(&self.config.punctuation)
-                        .next()
-                        .is_none()
+                    && HashSet::from_iter(word.chars()).intersection(&self.config.punctuation).next().is_none()
                 {
                     let index = word.to_lowercase();
                     let occurrence = Occurrence { shift_offset: shift + w_idx, idx, word, shift };
@@ -409,6 +408,8 @@ impl Yake {
         let only_alphanum = only_alphanum.unwrap_or(false); // fixme: replace with a function
 
         let in_char_set = |word: &str| word.chars().all(|ch| ch.is_alphanumeric() || ch == '-');
+        let is_punctuation =
+            |word: &str| HashSet::from_iter(word.chars()).intersection(&self.config.punctuation).next().is_some();
 
         // fixme: filter right before inserting into the set
         candidates.retain(|_k, v| !{
@@ -418,7 +419,7 @@ impl Yake {
 
             let has_float = || words.iter().any(|w| w.parse::<f64>().is_ok());
             let has_stop_word = || words.intersection(&self.config.stop_words).next().is_some();
-            let has_punctuation = || words.intersection(&self.config.punctuation).next().is_some();
+            let has_punctuation = || words.iter().any(|w| is_punctuation(w));
             let not_enough_symbols = || words.iter().map(|w| w.len()).sum::<usize>() < minimum_length;
             let has_too_short_word = || words.iter().map(|w| w.len()).min().unwrap_or(0) < minimum_word_size;
             let has_non_alphanumeric = || only_alphanum && words.iter().any(|w| !in_char_set(w));

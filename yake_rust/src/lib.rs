@@ -124,7 +124,7 @@ impl Yake {
         Self { config }
     }
 
-    pub fn get_n_best(&mut self, text: String, n: Option<usize>) -> Vec<ResultItem> {
+    pub fn get_n_best(&mut self, text: &str, n: Option<usize>) -> Vec<ResultItem> {
         let n = n.unwrap_or(10);
 
         let sentences = self.prepare_text(text);
@@ -175,9 +175,9 @@ impl Yake {
         unique
     }
 
-    fn prepare_text(&self, text: String) -> Sentences {
+    fn prepare_text(&self, text: &str) -> Sentences {
         let cfg = PreprocessorCfg::default();
-        preprocessor::split_into_sentences(&text, &cfg)
+        preprocessor::split_into_sentences(text, &cfg)
             .into_iter()
             .map(|sentence| {
                 let words = preprocessor::split_into_words(&sentence, &cfg);
@@ -478,7 +478,7 @@ mod tests {
     fn keywords() {
         let text = include_str!("test_google.txt");
 
-        let mut kwds = Yake::default().get_n_best(text.to_string(), Some(10));
+        let mut kwds = Yake::default().get_n_best(text, Some(10));
 
         // leave only 4 digits
         kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).trunc() / 10_000.);

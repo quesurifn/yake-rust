@@ -470,6 +470,22 @@ impl Yake {
     }
 }
 
+trait PluralHelper {
+    /// Omit the last `s` symbol in a string.
+    ///
+    /// How to use: `some_string.to_lowercase().to_single()`
+    fn to_single(self) -> String;
+}
+
+impl PluralHelper for String {
+    fn to_single(mut self) -> String {
+        if self.len() > 3 && self.ends_with('s') {
+            self.truncate(self.len() - 1)
+        }
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

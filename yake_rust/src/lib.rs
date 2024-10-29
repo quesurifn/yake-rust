@@ -481,7 +481,7 @@ mod tests {
         let mut kwds = Yake::default().get_n_best(text, Some(10));
 
         // leave only 4 digits
-        kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).trunc() / 10_000.);
+        kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
 
         let results: Results = vec![
             ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0299 },
@@ -489,13 +489,13 @@ mod tests {
             ResultItem {
                 raw: "Anthony Goldbloom declined".into(),
                 keyword: "anthony goldbloom declined".into(),
-                score: 0.0617,
+                score: 0.0618,
             },
             ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0626 },
-            ResultItem { raw: "founder CEO Anthony".into(), keyword: "founder ceo anthony".into(), score: 0.0684 },
-            ResultItem { raw: "hosts data science".into(), keyword: "hosts data science".into(), score: 0.0839 },
+            ResultItem { raw: "founder CEO Anthony".into(), keyword: "founder ceo anthony".into(), score: 0.0685 },
+            ResultItem { raw: "hosts data science".into(), keyword: "hosts data science".into(), score: 0.084 },
             ResultItem { raw: "acquiring Kaggle".into(), keyword: "acquiring kaggle".into(), score: 0.0872 },
-            ResultItem { raw: "CEO Anthony".into(), keyword: "ceo anthony".into(), score: 0.0891 },
+            ResultItem { raw: "CEO Anthony".into(), keyword: "ceo anthony".into(), score: 0.0892 },
             ResultItem { raw: "Anthony Goldbloom".into(), keyword: "anthony goldbloom".into(), score: 0.0912 },
             ResultItem {
                 raw: "machine learning competitions".into(),

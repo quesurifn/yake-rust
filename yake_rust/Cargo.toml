@@ -11,6 +11,46 @@ license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = [
+  "ar", "bg", "br", "cz", "da", "de", "el", "en", "es", "et", "fa", "fi", "fr", "hi", "hr", "hu", "hy", "id", "it", "ja",
+  "lt", "lv", "nl", "no", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "tr", "uk", "zh"
+]
+ar = []
+bg = []
+br = []
+cz = []
+da = []
+de = []
+el = []
+en = []
+es = []
+et = []
+fa = []
+fi = []
+fr = []
+hi = []
+hr = []
+hu = []
+hy = []
+id = []
+it = []
+ja = []
+lt = []
+lv = []
+nl = []
+no = []
+pl = []
+pt = []
+ro = []
+ru = []
+sk = []
+sl = []
+sv = []
+tr = []
+uk = []
+zh = []
+
 [dependencies]
 regex = "1"
 streaming-stats = "0.2.3"

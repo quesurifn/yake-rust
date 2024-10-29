@@ -8,10 +8,12 @@ use std::ops::Deref;
 
 use crate::levenshtein::levenshtein_ratio;
 use crate::preprocessor::PreprocessorCfg;
+pub use crate::stopwords::StopWords;
 use stats::{mean, median, stddev};
 
 mod levenshtein;
 mod preprocessor;
+mod stopwords;
 
 /// Lowercased string
 type LString = String;
@@ -72,13 +74,6 @@ struct Sentence {
     pub length: usize,
 }
 
-impl Sentence {
-    pub fn new(words: Vec<String>, stems: Vec<String>) -> Sentence {
-        let length = words.len();
-        Sentence { words, length, stems }
-    }
-}
-
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct PreCandidate<'sentence> {
     pub surface_forms: Vec<&'sentence [String]>,
@@ -89,47 +84,48 @@ struct PreCandidate<'sentence> {
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub ngram: usize,
+    /// The number of n-grams.
+    ///
+    /// _n-gram_ is a contiguous sequence of _n_ words occurring in the text.
+    pub ngrams: usize,
     /// List of punctuation symbols.
     ///
     /// They are known as _exclude chars_ in the original implementation.
     pub punctuation: HashSet<char>,
-    /// List of lowercased words to be filtered from the text.
-    pub stop_words: HashSet<LString>,
     pub window_size: usize,
     pub remove_duplicates: bool,
     /// A threshold in range 0..1.
-    pub dedupe_lim: f64,
+    pub deduplication_threshold: f64,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            stop_words: include_str!("stop_words.txt").lines().map(ToOwned::to_owned).collect(),
             punctuation: r##"!"#$%&'()*+,-./:,<=>?@[\]^_`{|}~"##.chars().collect(),
             window_size: 1,
-            dedupe_lim: 0.9,
-            ngram: 3,
+            deduplication_threshold: 0.9,
+            ngrams: 3,
             remove_duplicates: true,
         }
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Yake {
     config: Config,
+    stop_words: StopWords,
 }
 
 impl Yake {
-    pub fn new(config: Config) -> Yake {
-        Self { config }
+    pub fn new(stop_words: StopWords, config: Config) -> Yake {
+        Self { config, stop_words }
     }
 
     pub fn get_n_best(&mut self, text: &str, n: Option<usize>) -> Vec<ResultItem> {
         let n = n.unwrap_or(10);
 
-        let sentences = self.prepare_text(text);
-        let mut ngrams = self.ngram_selection(self.config.ngram, &sentences);
+        let sentences = self.preprocess_text(text);
+        let mut ngrams = self.ngram_selection(self.config.ngrams, &sentences);
         self.filter_candidates(&mut ngrams, None, None, None, None);
 
         let deduped_subgrams = self.candidate_selection(&mut ngrams);
@@ -165,8 +161,9 @@ impl Yake {
                 break;
             }
 
-            let is_duplicate =
-                unique.iter().any(|it| levenshtein_ratio(&it.keyword, &res.keyword) > self.config.dedupe_lim);
+            let is_duplicate = unique
+                .iter()
+                .any(|it| levenshtein_ratio(&it.keyword, &res.keyword) > self.config.deduplication_threshold);
 
             if !is_duplicate {
                 unique.push(res);
@@ -176,14 +173,14 @@ impl Yake {
         unique
     }
 
-    fn prepare_text(&self, text: &str) -> Sentences {
+    fn preprocess_text(&self, text: &str) -> Sentences {
         let cfg = PreprocessorCfg::default();
         preprocessor::split_into_sentences(text, &cfg)
             .into_iter()
             .map(|sentence| {
                 let words = preprocessor::split_into_words(&sentence, &cfg);
                 let stems = words.iter().map(|w| w.to_lowercase()).collect();
-                Sentence::new(words, stems)
+                Sentence { length: words.len(), words, stems }
             })
             .collect()
     }
@@ -258,11 +255,13 @@ impl Yake {
         contexts
     }
 
+    /// Computes local statistic features that extract informative content within the text
+    /// to calculate the importance of single terms.
     fn extract_features<'s>(&self, contexts: &Contexts, words: Words<'s>, sentences: &'s Sentences) -> Features {
         let tf = words.values().map(Vec::len);
         let tf_nsw = words
             .iter()
-            .filter_map(|(k, v)| if !self.config.stop_words.contains(&k.to_owned()) { Some(v.len()) } else { None })
+            .filter_map(|(k, v)| if !self.stop_words.contains(&k.to_owned()) { Some(v.len()) } else { None })
             .map(|x| x as f64)
             .collect::<Vec<_>>();
 
@@ -274,7 +273,7 @@ impl Yake {
 
         for (key, word) in words.into_iter() {
             let mut cand = YakeCandidate {
-                isstop: self.config.stop_words.contains(&key) || key.len() < 3,
+                isstop: self.stop_words.contains(&key) || key.len() < 3,
                 tf: word.len() as f64,
                 tf_a: 0.,
                 tf_u: 0.,
@@ -427,7 +426,7 @@ impl Yake {
             let words = HashSet::from_iter(first_surf_form.iter().map(|w| w.to_lowercase()));
 
             let has_float = || words.iter().any(|w| w.parse::<f64>().is_ok());
-            let has_stop_word = || words.intersection(&self.config.stop_words).next().is_some();
+            let has_stop_word = || words.intersection(&self.stop_words).next().is_some();
             let has_punctuation = || words.iter().any(|w| is_punctuation(w));
             let not_enough_symbols = || words.iter().map(|w| w.len()).sum::<usize>() < minimum_length;
             let has_too_short_word = || words.iter().map(|w| w.len()).min().unwrap_or(0) < minimum_word_size;
@@ -494,29 +493,30 @@ mod tests {
     #[test]
     fn keywords() {
         let text = include_str!("test_google.txt");
-        let mut kwds = Yake::default().get_n_best(text, Some(10));
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut kwds = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
 
         // leave only 4 digits
         kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
 
         let results: Results = vec![
-            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0299 },
-            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.0488 },
+            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0296 },
+            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.0484 },
             ResultItem {
                 raw: "Anthony Goldbloom declined".into(),
                 keyword: "anthony goldbloom declined".into(),
-                score: 0.0618,
+                score: 0.0605,
             },
-            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0626 },
-            ResultItem { raw: "founder CEO Anthony".into(), keyword: "founder ceo anthony".into(), score: 0.0685 },
-            ResultItem { raw: "hosts data science".into(), keyword: "hosts data science".into(), score: 0.084 },
-            ResultItem { raw: "acquiring Kaggle".into(), keyword: "acquiring kaggle".into(), score: 0.0872 },
-            ResultItem { raw: "CEO Anthony".into(), keyword: "ceo anthony".into(), score: 0.0892 },
-            ResultItem { raw: "Anthony Goldbloom".into(), keyword: "anthony goldbloom".into(), score: 0.0912 },
+            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0614 },
+            ResultItem { raw: "founder CEO Anthony".into(), keyword: "founder ceo anthony".into(), score: 0.0672 },
+            ResultItem { raw: "hosts data science".into(), keyword: "hosts data science".into(), score: 0.0806 },
+            ResultItem { raw: "acquiring Kaggle".into(), keyword: "acquiring kaggle".into(), score: 0.0855 },
+            ResultItem { raw: "CEO Anthony".into(), keyword: "ceo anthony".into(), score: 0.0885 },
+            ResultItem { raw: "Anthony Goldbloom".into(), keyword: "anthony goldbloom".into(), score: 0.0905 },
             ResultItem {
                 raw: "machine learning competitions".into(),
                 keyword: "machine learning competitions".into(),
-                score: 0.0992,
+                score: 0.0953,
             },
         ];
 
@@ -526,7 +526,8 @@ mod tests {
     #[test]
     fn short() {
         let text = "this is a keyword";
-        let mut kwds = Yake::default().get_n_best(text, Some(1));
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut kwds = Yake::new(stopwords, Config::default()).get_n_best(text, Some(1));
         // leave only 4 digits
         kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let results: Results = vec![ResultItem { raw: "keyword".into(), keyword: "keyword".into(), score: 0.1583 }];
@@ -539,7 +540,8 @@ mod tests {
         let text = "Do you like headphones? \
         Starting this Saturday, we will be kicking off a huge sale of headphones! \
         If you need headphones, we've got you coverered!";
-        let mut kwds = Yake::new(Config { ngram: 1, ..Default::default() }).get_n_best(text, Some(3));
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut kwds = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(3));
         // leave only 4 digits
         kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let results: Results = vec![
@@ -554,7 +556,8 @@ mod tests {
     #[test]
     fn medium_two() {
         let text = "Do you need an Apple laptop?";
-        let mut kwds = Yake::new(Config { ngram: 1, ..Default::default() }).get_n_best(text, Some(2));
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut kwds = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(2));
         // leave only 4 digits
         kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let results: Results = vec![

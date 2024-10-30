@@ -35,28 +35,39 @@ struct WeightedCandidates {
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 struct Occurrence<'sentence> {
+    /// Ordinal number of the word in the source text after splitting into sentences
     pub shift_offset: usize,
+    /// The total number of words in all previous sentences.
     pub shift: usize,
-    /// sentence index
+    /// Index (0..) of sentence where the term occur
     pub idx: usize,
+    /// The word itself
     pub word: &'sentence String,
 }
 
 #[derive(Debug, Default)]
 struct YakeCandidate {
-    isstop: bool,
+    is_stopword: bool,
+    /// Term frequency. The total number of occurrences in the text.
     tf: f64,
+    /// The number of times this candidate term is marked as an acronym (=all uppercase).
     tf_a: f64,
+    /// The number of occurrences of this candidate term starting with an uppercase letter.
     tf_u: f64,
+    /// Term casing heuristic.
     casing: f64,
+    /// Term position heuristic
     position: f64,
+    /// Normalized term frequency heuristic
     frequency: f64,
-    wl: f64,
-    wr: f64,
-    pl: f64,
-    pr: f64,
-    different: f64,
+    /// Left dispersion
+    dl: f64,
+    /// Right dispersion
+    dr: f64,
+    /// Term relatedness to context
     relatedness: f64,
+    /// Term's different sentences heuristic
+    sentences: f64,
     weight: f64,
 }
 
@@ -225,6 +236,9 @@ impl Yake {
         words
     }
 
+    /// Builds co-occurrence matrix containing the co-occurrences between
+    /// a given term and its predecessor AND a given term and its subsequent term,
+    /// found within a window of a given size.
     fn build_context(&self, sentences: &Sentences) -> Contexts {
         let mut contexts = Contexts::new();
 
@@ -261,6 +275,7 @@ impl Yake {
         let tf = words.values().map(Vec::len);
         let tf_nsw = words
             .iter()
+            // fixme: add len < 3 for stopwords
             .filter_map(|(k, v)| if !self.stop_words.contains(&k.to_owned()) { Some(v.len()) } else { None })
             .map(|x| x as f64)
             .collect::<Vec<_>>();
@@ -271,19 +286,21 @@ impl Yake {
 
         let mut features = Features::new();
 
-        for (key, word) in words.into_iter() {
+        for (key, occurrences) in words.into_iter() {
             let mut cand = YakeCandidate {
-                isstop: self.stop_words.contains(&key) || key.len() < 3,
-                tf: word.len() as f64,
-                tf_a: 0.,
-                tf_u: 0.,
+                is_stopword: self.stop_words.contains(&key) || key.len() < 3,
+                tf: occurrences.len() as f64,
                 ..Default::default()
             };
 
-            for occurrence in word.iter() {
+            for occurrence in occurrences.iter() {
+                // We consider the occurrence of acronyms through a heuristic, where all the letters
+                // of the word are capitals.
                 if occurrence.word.chars().all(char::is_uppercase) && occurrence.word.len() > 1 {
                     cand.tf_a += 1.0;
                 }
+                // We give extra attention to any term beginning with a capital letter
+                // (excluding the beginning of sentences). todo: what about the rest letters?
                 if occurrence.word.chars().nth(0).unwrap_or(' ').is_uppercase()
                     && occurrence.shift != occurrence.shift_offset
                 {
@@ -291,44 +308,77 @@ impl Yake {
                 }
             }
 
-            cand.casing = cand.tf_a.max(cand.tf_u);
-            cand.casing /= 1.0 + cand.tf.ln();
-
-            let sentence_ids = word.iter().map(|o| o.idx).collect::<HashSet<usize>>();
-            cand.position = (3.0 + median(sentence_ids.iter().copied()).unwrap()).ln();
-            cand.position = cand.position.ln();
-
-            cand.frequency = cand.tf;
-            cand.frequency /= mean_tf + std_tf;
-
-            cand.wl = 0.0;
-            cand.pl = 0.0;
-            cand.wr = 0.0;
-            cand.pr = 0.0;
-
-            if let Some(ctx) = contexts.get(&key) {
-                let ctx_1_hash: HashSet<&str> = HashSet::from_iter(ctx.0.iter().map(Deref::deref));
-                if ctx.0.len() > 0 {
-                    cand.wl = ctx_1_hash.len() as f64;
-                    cand.wl /= ctx.0.len() as f64;
-                }
-                cand.pl = ctx_1_hash.len() as f64 / max_tf;
-
-                let ctx_2_hash: HashSet<&str> = HashSet::from_iter(ctx.1.iter().map(Deref::deref));
-                if ctx.1.len() > 0 {
-                    cand.wr = ctx_2_hash.len() as f64;
-                    cand.wr /= ctx.1.len() as f64;
-                }
-                cand.pr = ctx_2_hash.len() as f64 / max_tf;
+            {
+                // The casing aspect of a term is an important feature when considering the extraction
+                // of keywords. The underlying rationale is that uppercase terms tend to be more
+                // relevant than lowercase ones.
+                cand.casing = cand.tf_a.max(cand.tf_u);
+                // The more often the candidate term occurs with a capital letter, the more important
+                // it is considered. This means that a candidate term that occurs with a capital letter
+                // ten times within ten occurrences will be given a higher value (4.34) than a candidate
+                // term that occurs with a capital letter five times within five occurrences (3.10).
+                cand.casing /= 1.0 + cand.tf.ln(); // todo: no 1+ in the paper
             }
 
-            cand.relatedness = 1.0;
-            cand.relatedness += (cand.wr + cand.wl) * (cand.tf / max_tf);
+            {
+                // Another indicator of the importance of a candidate term is its position.
+                // The rationale is that relevant keywords tend to appear at the very beginning
+                // of a document, whereas words occurring in the middle or at the end of a document
+                // tend to be less important.
+                //
+                // This is particularly evident for both news articles and scientific texts,
+                // which tend to concentrate a high degree of important
+                // keywords at the top of the text (e.g., in the introduction or abstract).
+                //
+                // Like Florescu and Caragea, who posit that models that take into account the positions
+                // of terms perform better than those that only use the first position or no position
+                // at all, we also consider a term’s position to be an important feature. However,
+                // unlike their model, we do not consider the positions of the terms,
+                // but of the sentences in which the terms occur.
+                //
+                // Our assumption is that terms that occur in the early
+                // sentences of a text should be more highly valued than terms that appear later. Thus,
+                // instead of considering a uniform distribution of terms, our model assigns higher
+                // scores to terms found in early sentences. todo: set affects median
+                let sentence_ids: HashSet<_> = occurrences.iter().map(|o| o.idx).collect();
+                // When the candidate term only appears in the first sentence, the median function
+                // can return a value of 0. To guarantee position > 0, a constant 3 > e=2.71 is added.
+                cand.position = 3.0 + median(sentence_ids.into_iter()).unwrap();
+                // A double log is applied in order to smooth the difference between terms that occur
+                // with a large median difference.
+                cand.position = cand.position.ln().ln();
+            }
 
-            cand.different = sentence_ids.len() as f64;
-            cand.different /= sentences.len() as f64;
+            {
+                // The higher the frequency of a candidate term, the greater its importance.
+                cand.frequency = cand.tf;
+                // To prevent a bias towards high frequency in long documents, we balance it.
+                // The mean and the standard deviation is calculated from non-stopwords terms,
+                // as stopwords usually have high frequencies.
+                cand.frequency /= mean_tf + std_tf;
+            }
+
+            {
+                if let Some((leftward, rightward)) = contexts.get(&key) {
+                    let distinct: HashSet<&str> = HashSet::from_iter(leftward.iter().map(Deref::deref));
+                    cand.dl = if leftward.is_empty() { 0. } else { distinct.len() as f64 / leftward.len() as f64 };
+
+                    let distinct: HashSet<&str> = HashSet::from_iter(rightward.iter().map(Deref::deref));
+                    cand.dr = if rightward.is_empty() { 0. } else { distinct.len() as f64 / rightward.len() as f64 };
+                }
+
+                cand.relatedness = 1.0 + (cand.dr + cand.dl) * (cand.tf / max_tf);
+            }
+
+            {
+                // Candidates which appear in many different sentences have a higher probability
+                // of being important.
+                let distinct = occurrences.iter().map(|o| o.idx).collect::<HashSet<_>>();
+                cand.sentences = distinct.len() as f64 / sentences.len() as f64;
+            }
+
             cand.weight = (cand.relatedness * cand.position)
-                / (cand.casing + (cand.frequency / cand.relatedness) + (cand.different / cand.relatedness));
+                / (cand.casing + (cand.frequency / cand.relatedness) + (cand.sentences / cand.relatedness));
 
             features.insert(key, cand);
         }
@@ -361,7 +411,7 @@ impl Yake {
 
                 for (j, token) in tokens.clone().enumerate() {
                     let Some(feat_cand) = features.get(&token) else { continue };
-                    if feat_cand.isstop {
+                    if feat_cand.is_stopword {
                         let term_stop = token;
                         let mut prob_t1 = 0.0;
                         let mut prob_t2 = 0.0;

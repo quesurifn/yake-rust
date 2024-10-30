@@ -158,7 +158,7 @@ impl Yake {
         Self { config, stop_words }
     }
 
-    pub fn get_n_best(&mut self, text: &str, n: Option<usize>) -> Vec<ResultItem> {
+    pub fn get_n_best(&self, text: &str, n: Option<usize>) -> Vec<ResultItem> {
         let n = n.unwrap_or(10);
 
         let sentences = self.preprocess_text(text);

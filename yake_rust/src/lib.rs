@@ -49,9 +49,15 @@ impl<'s> Occurrence<'s> {
         self.word.len() > 1 && self.word.chars().all(char::is_uppercase)
     }
 
-    fn is_capital(&self) -> bool {
+    /// The first symbol is uppercase.
+    fn is_uppercased(&self) -> bool {
+        self.word.chars().next().is_some_and(char::is_uppercase)
+    }
+
+    /// Only the first symbol is uppercase.
+    fn is_capitalized(&self) -> bool {
         let mut chars = self.word.chars();
-        chars.next().is_some_and(char::is_uppercase) // todo: what about the rest letters?
+        chars.next().is_some_and(char::is_uppercase) && !chars.any(char::is_uppercase)
     }
 
     fn is_first_word(&self) -> bool {
@@ -121,6 +127,11 @@ pub struct Config {
     pub remove_duplicates: bool,
     /// A threshold in range 0..1.
     pub deduplication_threshold: f64,
+    /// When `true`, calculate _term casing_ metric by counting capitalized terms _without_
+    /// intermediate uppercase letters. Thus, `Paypal` is counted while `PayPal` is not.
+    ///
+    /// The [original implementation](https://github.com/LIAAD/) sticks with `true`.
+    pub strict_capital: bool,
 }
 
 impl Default for Config {
@@ -131,6 +142,7 @@ impl Default for Config {
             deduplication_threshold: 0.9,
             ngrams: 3,
             remove_duplicates: true,
+            strict_capital: true,
         }
     }
 }
@@ -312,7 +324,10 @@ impl Yake {
                 cand.tf_a = occurrences.iter().filter(|&occ| occ.is_acronym()).count() as f64;
 
                 // We give extra attention to any term beginning with a capital letter (excluding the beginning of sentences).
-                cand.tf_u = occurrences.iter().filter(|&occ| occ.is_capital() && !occ.is_first_word()).count() as f64;
+                let is_capital =
+                    if self.config.strict_capital { Occurrence::is_capitalized } else { Occurrence::is_uppercased };
+
+                cand.tf_u = occurrences.iter().filter(|&occ| is_capital(occ) && !occ.is_first_word()).count() as f64;
 
                 // The casing aspect of a term is an important feature when considering the extraction
                 // of keywords. The underlying rationale is that uppercase terms tend to be more

@@ -1,15 +1,14 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::type_complexity)]
 
-use std::cmp::min;
-use std::collections::{HashMap, HashSet};
-use std::iter::FromIterator;
-use std::ops::Deref;
-
 use crate::levenshtein::levenshtein_ratio;
 use crate::preprocessor::PreprocessorCfg;
 pub use crate::stopwords::StopWords;
 use stats::{mean, median, stddev};
+use std::cmp::min;
+use std::collections::{HashMap, HashSet};
+use std::iter::FromIterator;
+use std::ops::Deref;
 
 mod levenshtein;
 mod preprocessor;
@@ -43,6 +42,21 @@ struct Occurrence<'sentence> {
     pub idx: usize,
     /// The word itself
     pub word: &'sentence String,
+}
+
+impl<'s> Occurrence<'s> {
+    fn is_acronym(&self) -> bool {
+        self.word.len() > 1 && self.word.chars().all(char::is_uppercase)
+    }
+
+    fn is_capital(&self) -> bool {
+        let mut chars = self.word.chars();
+        chars.next().is_some_and(char::is_uppercase) // todo: what about the rest letters?
+    }
+
+    fn is_first_word(&self) -> bool {
+        self.shift == self.shift_offset
+    }
 }
 
 #[derive(Debug, Default)]
@@ -293,26 +307,18 @@ impl Yake {
                 ..Default::default()
             };
 
-            for occurrence in occurrences.iter() {
-                // We consider the occurrence of acronyms through a heuristic, where all the letters
-                // of the word are capitals.
-                if occurrence.word.chars().all(char::is_uppercase) && occurrence.word.len() > 1 {
-                    cand.tf_a += 1.0;
-                }
-                // We give extra attention to any term beginning with a capital letter
-                // (excluding the beginning of sentences). todo: what about the rest letters?
-                if occurrence.word.chars().nth(0).unwrap_or(' ').is_uppercase()
-                    && occurrence.shift != occurrence.shift_offset
-                {
-                    cand.tf_u += 1.0;
-                }
-            }
-
             {
+                // We consider the occurrence of acronyms through a heuristic, where all the letters of the word are capitals.
+                cand.tf_a = occurrences.iter().filter(|&occ| occ.is_acronym()).count() as f64;
+
+                // We give extra attention to any term beginning with a capital letter (excluding the beginning of sentences).
+                cand.tf_u = occurrences.iter().filter(|&occ| occ.is_capital() && !occ.is_first_word()).count() as f64;
+
                 // The casing aspect of a term is an important feature when considering the extraction
                 // of keywords. The underlying rationale is that uppercase terms tend to be more
                 // relevant than lowercase ones.
                 cand.casing = cand.tf_a.max(cand.tf_u);
+
                 // The more often the candidate term occurs with a capital letter, the more important
                 // it is considered. This means that a candidate term that occurs with a capital letter
                 // ten times within ten occurrences will be given a higher value (4.34) than a candidate

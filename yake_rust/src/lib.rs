@@ -159,8 +159,6 @@ impl Yake {
     }
 
     pub fn get_n_best(&self, text: &str, n: Option<usize>) -> Vec<ResultItem> {
-        let n = n.unwrap_or(10);
-
         let sentences = self.preprocess_text(text);
         let mut ngrams = self.ngram_selection(self.config.ngrams, &sentences);
         self.filter_candidates(&mut ngrams, None, None, None, None);
@@ -182,6 +180,7 @@ impl Yake {
 
         results.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
 
+        let n = n.unwrap_or(usize::MAX);
         if self.config.remove_duplicates {
             self.remove_duplicates(results, n)
         } else {

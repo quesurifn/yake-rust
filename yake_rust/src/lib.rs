@@ -663,18 +663,19 @@ mod tests {
     fn plural() {
         let text = "One smartwatch. One phone. Many phones.";
         let stopwords = StopWords::predefined("en").unwrap();
-        let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(2));
+        let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(3));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected: Results = vec![
             ResultItem { raw: "smartwatch".into(), keyword: "smartwatch".into(), score: 0.1370 },
             ResultItem { raw: "phone".into(), keyword: "phone".into(), score: 0.3553 },
+            ResultItem { raw: "phones".into(), keyword: "phones".into(), score: 0.4454 },
         ];
 
         // LIAAD REFERENCE:
         // smartwatch 0.2025
         // phone 0.4949
-        // (phones 0.4949)
+        // phones 0.4949
 
         // REASONS FOR DISCREPANCY:
         // - LIAAD/yake does special handling of plural

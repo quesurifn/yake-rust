@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 use std::ops::Deref;
 
+use indexmap::IndexMap;
 use stats::{mean, median, stddev};
 
 use crate::levenshtein::levenshtein_ratio;
@@ -21,14 +22,14 @@ type LString = String;
 
 type Sentences = Vec<Sentence>;
 /// Key is `stems.join(" ")`
-type Candidates<'s> = HashMap<LString, PreCandidate<'s>>;
+type Candidates<'s> = IndexMap<LString, PreCandidate<'s>>;
 type Features = HashMap<LString, YakeCandidate>;
 type Words<'s> = HashMap<LString, Vec<Occurrence<'s>>>;
 type Contexts = HashMap<LString, (Vec<LString>, Vec<LString>)>;
 type DedupeSubgram = HashMap<LString, bool>;
 
 struct WeightedCandidates {
-    final_weights: HashMap<LString, f64>,
+    final_weights: IndexMap<LString, f64>,
     surface_to_lexical: HashMap<LString, String>,
     contexts: Contexts,
     raw_lookup: HashMap<LString, String>,
@@ -162,7 +163,7 @@ impl Yake {
 
     pub fn get_n_best(&self, text: &str, n: Option<usize>) -> Vec<ResultItem> {
         let sentences = self.preprocess_text(text);
-        let mut ngrams = self.ngram_selection(self.config.ngrams, &sentences);
+        let mut ngrams: Candidates = self.ngram_selection(self.config.ngrams, &sentences);
         self.filter_candidates(&mut ngrams, None, None, None, None);
 
         let deduped_subgrams = self.candidate_selection(&mut ngrams);
@@ -415,7 +416,7 @@ impl Yake {
         candidates: Candidates,
         dedupe_subgram: DedupeSubgram,
     ) -> WeightedCandidates {
-        let mut final_weights = HashMap::new();
+        let mut final_weights: IndexMap<String, f64> = IndexMap::new();
         let mut surface_to_lexical = HashMap::new();
         let mut raw_lookup = HashMap::new();
 
@@ -495,7 +496,7 @@ impl Yake {
         candidates.retain(|_k, v| !{
             // get the words from the first occurring surface form
             let first_surf_form = v.surface_forms[0];
-            let words = HashSet::from_iter(first_surf_form.iter().map(|w| w.to_lowercase()));
+            let words: HashSet<String> = HashSet::from_iter(first_surf_form.iter().map(|w| w.to_lowercase()));
 
             let has_float = || words.iter().any(|w| w.parse::<f64>().is_ok());
             let has_stop_word = || words.intersection(&self.stop_words).next().is_some();
@@ -516,7 +517,7 @@ impl Yake {
     }
 
     fn ngram_selection<'s>(&self, n: usize, sentences: &'s Sentences) -> Candidates<'s> {
-        let mut candidates = Candidates::new();
+        let mut candidates: IndexMap<String, PreCandidate<'_>> = Candidates::new();
         for (idx, sentence) in sentences.iter().enumerate() {
             let skip = min(n, sentence.length);
             let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
@@ -743,7 +744,7 @@ mod tests {
     fn google_sample_single_ngram() {
         let text = include_str!("test_google.txt"); // LIAAD/yake sample text
         let stopwords = StopWords::predefined("en").unwrap();
-        let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(9));
+        let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(10));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected: Results = vec![
@@ -756,8 +757,8 @@ mod tests {
             ResultItem { raw: "acquiring".into(), keyword: "acquiring".into(), score: 0.1494 }, // LIAAD REFERENCE: 0.1511
             ResultItem { raw: "competition".into(), keyword: "competition".into(), score: 0.153 }, // Not in top 9 of LIAAD/yake
             ResultItem { raw: "Goldbloom".into(), keyword: "goldbloom".into(), score: 0.1619 }, // LIAAD REFERENCE: 0.1625
+            ResultItem { raw: "machine".into(), keyword: "machine".into(), score: 0.1708 }, // LIAAD REFERENCE: 0.1625
         ];
-        // "machine" has the same score as "learning" so test becomes unstable if n=10 because of the use of HashSet
 
         assert_eq!(actual, expected);
     }

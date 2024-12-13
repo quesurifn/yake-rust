@@ -57,6 +57,7 @@ streaming-stats = "0.2.3"
 contractions = "0.5.4"
 unicode-segmentation = "1.12.0"
 levenshtein = "1.0.5"
+indexmap = "2.7.0"
 
 [lib]
 path = "src/lib.rs"

@@ -577,6 +577,24 @@ mod tests {
     }
 
     #[test]
+    fn order() {
+        // Verifies that order of keywords with the same store is preserved.
+        // If not, this test becomes unstable.
+        let text = "Machine learning";
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(3));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "Machine".into(), keyword: "machine".into(), score: 0.1583 },
+            ResultItem { raw: "learning".into(), keyword: "learning".into(), score: 0.1583 },
+        ];
+        // Results agree with reference implementation LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn laptop() {
         let text = "Do you need an Apple laptop?";
         let stopwords = StopWords::predefined("en").unwrap();

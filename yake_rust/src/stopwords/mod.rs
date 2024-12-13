@@ -1,6 +1,7 @@
-use crate::LString;
 use std::collections::HashSet;
 use std::ops::Deref;
+
+use crate::LString;
 
 /// List of lowercased words to be filtered out from the text.
 ///

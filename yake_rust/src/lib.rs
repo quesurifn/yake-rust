@@ -1,14 +1,16 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::type_complexity)]
 
-use crate::levenshtein::levenshtein_ratio;
-use crate::preprocessor::PreprocessorCfg;
-pub use crate::stopwords::StopWords;
-use stats::{mean, median, stddev};
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 use std::ops::Deref;
+
+use stats::{mean, median, stddev};
+
+use crate::levenshtein::levenshtein_ratio;
+use crate::preprocessor::PreprocessorCfg;
+pub use crate::stopwords::StopWords;
 
 mod levenshtein;
 mod preprocessor;
@@ -561,80 +563,244 @@ mod tests {
     type Results = Vec<ResultItem>;
 
     #[test]
-    fn keywords() {
-        let text = include_str!("test_google.txt");
-        let stopwords = StopWords::predefined("en").unwrap();
-        let mut kwds = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
-
-        // leave only 4 digits
-        kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-
-        let results: Results = vec![
-            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0296 },
-            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.0484 },
-            ResultItem {
-                raw: "Anthony Goldbloom declined".into(),
-                keyword: "anthony goldbloom declined".into(),
-                score: 0.0605,
-            },
-            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0614 },
-            ResultItem { raw: "founder CEO Anthony".into(), keyword: "founder ceo anthony".into(), score: 0.0672 },
-            ResultItem { raw: "hosts data science".into(), keyword: "hosts data science".into(), score: 0.0806 },
-            ResultItem { raw: "acquiring Kaggle".into(), keyword: "acquiring kaggle".into(), score: 0.0855 },
-            ResultItem { raw: "CEO Anthony".into(), keyword: "ceo anthony".into(), score: 0.0885 },
-            ResultItem { raw: "Anthony Goldbloom".into(), keyword: "anthony goldbloom".into(), score: 0.0905 },
-            ResultItem {
-                raw: "machine learning competitions".into(),
-                keyword: "machine learning competitions".into(),
-                score: 0.0953,
-            },
-        ];
-
-        assert_eq!(kwds, results);
-    }
-
-    #[test]
     fn short() {
         let text = "this is a keyword";
         let stopwords = StopWords::predefined("en").unwrap();
-        let mut kwds = Yake::new(stopwords, Config::default()).get_n_best(text, Some(1));
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(1));
         // leave only 4 digits
-        kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let results: Results = vec![ResultItem { raw: "keyword".into(), keyword: "keyword".into(), score: 0.1583 }];
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![ResultItem { raw: "keyword".into(), keyword: "keyword".into(), score: 0.1583 }];
+        // Results agree with reference implementation LIAAD/yake
 
-        assert_eq!(kwds, results);
+        assert_eq!(actual, expected);
     }
 
     #[test]
-    fn medium() {
+    fn laptop() {
+        let text = "Do you need an Apple laptop?";
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(2));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "Apple".into(), keyword: "apple".into(), score: 0.1448 },
+            ResultItem { raw: "laptop".into(), keyword: "laptop".into(), score: 0.1583 },
+        ];
+        // Results agree with reference implementation LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn headphones() {
         let text = "Do you like headphones? \
         Starting this Saturday, we will be kicking off a huge sale of headphones! \
-        If you need headphones, we've got you coverered!";
+        If you need headphones, we've got you covered!";
         let stopwords = StopWords::predefined("en").unwrap();
-        let mut kwds = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(3));
+        let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(3));
         // leave only 4 digits
-        kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let results: Results = vec![
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
             ResultItem { raw: "headphones".into(), keyword: "headphones".into(), score: 0.1141 },
             ResultItem { raw: "Saturday".into(), keyword: "saturday".into(), score: 0.2111 },
             ResultItem { raw: "Starting".into(), keyword: "starting".into(), score: 0.4096 },
         ];
+        // Results agree with reference implementation LIAAD/yake
 
-        assert_eq!(kwds, results);
+        assert_eq!(actual, expected);
     }
 
     #[test]
-    fn medium_two() {
-        let text = "Do you need an Apple laptop?";
+    fn multi_ngram() {
+        let text = "I will give you a great deal if you just read this!";
         let stopwords = StopWords::predefined("en").unwrap();
-        let mut kwds = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(2));
+        let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(1));
         // leave only 4 digits
-        kwds.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let results: Results = vec![
-            ResultItem { raw: "Apple".into(), keyword: "apple".into(), score: 0.1448 },
-            ResultItem { raw: "laptop".into(), keyword: "laptop".into(), score: 0.1583 },
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results =
+            vec![ResultItem { raw: "great deal".into(), keyword: "great deal".into(), score: 0.0257 }];
+        // Results agree with reference implementation LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn singular() {
+        let text = "One smartwatch. One phone. Many phone."; // Weird grammar; to compare with the "plural" test
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(2));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "smartwatch".into(), keyword: "smartwatch".into(), score: 0.2025 },
+            ResultItem { raw: "phone".into(), keyword: "phone".into(), score: 0.2474 },
+        ];
+        // Results agree with reference implementation LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn plural() {
+        let text = "One smartwatch. One phone. Many phones.";
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(2));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "smartwatch".into(), keyword: "smartwatch".into(), score: 0.1370 },
+            ResultItem { raw: "phone".into(), keyword: "phone".into(), score: 0.3553 },
         ];
 
-        assert_eq!(kwds, results);
+        // LIAAD REFERENCE:
+        // smartwatch 0.2025
+        // phone 0.4949
+        // (phones 0.4949)
+
+        // REASONS FOR DISCREPANCY:
+        // - LIAAD/yake does special handling of plural
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn non_hyphenated() {
+        let text = "Truly high tech!"; // For comparison with the "hyphenated" test
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(1));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results =
+            vec![ResultItem { raw: "high tech".into(), keyword: "high tech".into(), score: 0.0494 }];
+        // Results agree with reference implementation LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn hyphenated() {
+        let text = "Truly high-tech!";
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(1));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![ResultItem { raw: "tech".into(), keyword: "tech".into(), score: 0.0449 }];
+
+        // LIAAD REFERENCE:
+        // high-tech 0.1583
+
+        // REASONS FOR DISCREPANCY:
+        // - unicode-segmentation splits by hyphen, segtok does not. This choice is intentional
+        //   by unicode-segmentation, and segtok's successor syntok also splits by hyphen.
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn weekly_newsletter_short() {
+        let text = "This is your weekly newsletter!";
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(3));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "weekly newsletter".into(), keyword: "weekly newsletter".into(), score: 0.0494 },
+            ResultItem { raw: "newsletter".into(), keyword: "newsletter".into(), score: 0.9499 }, // LIAAD REFERENCE: 0.1583
+            ResultItem { raw: "weekly".into(), keyword: "weekly".into(), score: 1.7842 }, // LIAAD REFERENCE: 0.2974
+        ];
+
+        // REASONS FOR DISCREPANCY:
+        // - issue with multi-word ngrams - the constitutent words get different scores compared to LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn weekly_newsletter_long() {
+        let text = "This is your weekly newsletter! \
+            Hundreds of great deals - everything from men's fashion \
+            to high-tech drones!";
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(2));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "weekly newsletter".into(), keyword: "weekly newsletter".into(), score: 0.0780 },
+            ResultItem { raw: "tech drones".into(), keyword: "tech drones".into(), score: 0.2767 },
+        ];
+        // LIIAD REFERENCE:
+        // weekly newsletter 0.0780 (same)
+        // newsletter 0.2005 (much lower score than our implementation)
+
+        // REASONS FOR DISCREPANCY:
+        // - "high-tech" gets split into "high" and "tech" by unicode segmentation
+        // - issue with multi-word ngrams - the constitutent words get different scores compared to LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn google_sample_single_ngram() {
+        let text = include_str!("test_google.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(9));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "Google".into(), keyword: "google".into(), score: 0.025 }, // LIAAD REFERENCE: 0.0251
+            ResultItem { raw: "Kaggle".into(), keyword: "kaggle".into(), score: 0.0272 }, // LIAAD REFERENCE: 0.0273
+            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.0793 },    // LIAAD REFERENCE: 0.0800
+            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0972 }, // LIAAD REFERENCE: 0.0983
+            ResultItem { raw: "platform".into(), keyword: "platform".into(), score: 0.1233 }, // LIAAD REFERENCE: 0.1240
+            ResultItem { raw: "service".into(), keyword: "service".into(), score: 0.1306 }, // LIAAD REFERENCE: 0.1316
+            ResultItem { raw: "acquiring".into(), keyword: "acquiring".into(), score: 0.1494 }, // LIAAD REFERENCE: 0.1511
+            ResultItem { raw: "competition".into(), keyword: "competition".into(), score: 0.153 }, // Not in top 9 of LIAAD/yake
+            ResultItem { raw: "Goldbloom".into(), keyword: "goldbloom".into(), score: 0.1619 }, // LIAAD REFERENCE: 0.1625
+        ];
+        // "machine" has the same score as "learning" so test becomes unstable if n=10 because of the use of HashSet
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn google_sample_defaults() {
+        let text = include_str!("test_google.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0478 },
+            ResultItem { raw: "data science".into(), keyword: "data science".into(), score: 0.0537 },
+            ResultItem { raw: "acquiring data science".into(), keyword: "acquiring data science".into(), score: 0.058 },
+            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0732 },
+            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.0908 },
+            ResultItem {
+                raw: "Anthony Goldbloom declined".into(),
+                keyword: "anthony goldbloom declined".into(),
+                score: 0.0957,
+            },
+            ResultItem {
+                raw: "science community Kaggle".into(),
+                keyword: "science community kaggle".into(),
+                score: 0.0985,
+            },
+            ResultItem { raw: "Google Cloud".into(), keyword: "google cloud".into(), score: 0.1126 },
+            ResultItem { raw: "founder CEO Anthony".into(), keyword: "founder ceo anthony".into(), score: 0.1142 },
+            ResultItem { raw: "acquiring Kaggle".into(), keyword: "acquiring kaggle".into(), score: 0.1181 },
+        ];
+        // LIAAD REFERENCE:
+        // Google 0.0251
+        // Kaggle 0.0273
+        // CEO Anthony Goldbloom 0.0483
+        // data science 0.0550
+        // acquiring data science 0.0603
+        // Google Cloud Platform 0.0746
+        // data 0.0800
+        // San Francisco 0.0914
+        // Anthony Goldbloom declined 0.0974
+        // science 0.0983
+
+        assert_eq!(actual, expected);
     }
 }

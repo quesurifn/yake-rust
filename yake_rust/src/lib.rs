@@ -573,7 +573,7 @@ mod tests {
 
     #[test]
     fn order() {
-        // Verifies that order of keywords with the same store is preserved.
+        // Verifies that order of keywords with the same score is preserved.
         // If not, this test becomes unstable.
         let text = "Machine learning";
         let stopwords = StopWords::predefined("en").unwrap();

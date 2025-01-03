@@ -26,7 +26,6 @@ type Candidates<'s> = IndexMap<LString, PreCandidate<'s>>;
 type Features = HashMap<LString, YakeCandidate>;
 type Words<'s> = HashMap<LString, Vec<Occurrence<'s>>>;
 type Contexts = HashMap<LString, (Vec<LString>, Vec<LString>)>;
-type DedupeSubgram = HashMap<LString, bool>;
 
 struct WeightedCandidates {
     final_weights: IndexMap<LString, f64>,
@@ -166,11 +165,11 @@ impl Yake {
         let mut ngrams: Candidates = self.ngram_selection(self.config.ngrams, &sentences);
         self.filter_candidates(&mut ngrams, None, None, None, None);
 
-        let deduped_subgrams = self.candidate_selection(&mut ngrams);
+        self.candidate_selection(&mut ngrams);
         let vocabulary = self.build_vocabulary(&sentences);
         let context = self.build_context(&sentences);
         let features = self.extract_features(&context, vocabulary, &sentences);
-        let weighted_candidates = self.candidate_weighting(features, context, ngrams, deduped_subgrams);
+        let weighted_candidates = self.candidate_weighting(features, context, ngrams);
 
         let mut results = weighted_candidates
             .final_weights
@@ -224,23 +223,14 @@ impl Yake {
             .collect()
     }
 
-    fn candidate_selection<'s>(&self, candidates: &mut Candidates<'s>) -> DedupeSubgram {
-        let mut deduped = DedupeSubgram::new();
-
+    fn candidate_selection<'s>(&self, candidates: &mut Candidates<'s>) -> () {
         candidates.retain(|_k, v| !{
             let first_surf_form = &v.surface_forms[0];
-
-            if first_surf_form.len() > 1 {
-                deduped.extend(first_surf_form.iter().map(|word| (word.to_lowercase(), true)));
-            }
-
             let (fst, lst) = (&first_surf_form[0], first_surf_form.last().unwrap());
 
             // remove candidate if
             fst.len() < 3 || lst.len() < 3
         });
-
-        deduped
     }
 
     fn build_vocabulary<'s>(&self, sentences: &'s [Sentence]) -> Words<'s> {
@@ -414,7 +404,6 @@ impl Yake {
         features: Features,
         contexts: Contexts,
         candidates: Candidates,
-        dedupe_subgram: DedupeSubgram,
     ) -> WeightedCandidates {
         let mut final_weights: IndexMap<String, f64> = IndexMap::new();
         let mut surface_to_lexical = HashMap::new();

@@ -427,11 +427,6 @@ impl Yake {
                 let mut prod_ = 1.0;
                 let mut sum_ = 0.0;
 
-                // Dedup Subgram; Penalize subgrams
-                if dedupe_subgram.contains_key(&candidate) {
-                    prod_ += 5.0;
-                }
-
                 for (j, token) in tokens.clone().enumerate() {
                     let Some(feat_cand) = features.get(&token) else { continue };
                     if feat_cand.is_stopword {
@@ -725,12 +720,10 @@ mod tests {
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected: Results = vec![
             ResultItem { raw: "weekly newsletter".into(), keyword: "weekly newsletter".into(), score: 0.0494 },
-            ResultItem { raw: "newsletter".into(), keyword: "newsletter".into(), score: 0.9499 }, // LIAAD REFERENCE: 0.1583
-            ResultItem { raw: "weekly".into(), keyword: "weekly".into(), score: 1.7842 }, // LIAAD REFERENCE: 0.2974
+            ResultItem { raw: "newsletter".into(), keyword: "newsletter".into(), score: 0.1583 },
+            ResultItem { raw: "weekly".into(), keyword: "weekly".into(), score: 0.2974 },
         ];
-
-        // REASONS FOR DISCREPANCY:
-        // - issue with multi-word ngrams - the constitutent words get different scores compared to LIAAD/yake
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }
@@ -741,20 +734,25 @@ mod tests {
             Hundreds of great deals - everything from men's fashion \
             to high-tech drones!";
         let stopwords = StopWords::predefined("en").unwrap();
-        let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(2));
+        let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(5));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected: Results = vec![
             ResultItem { raw: "weekly newsletter".into(), keyword: "weekly newsletter".into(), score: 0.0780 },
+            ResultItem { raw: "newsletter".into(), keyword: "newsletter".into(), score: 0.2005 },
             ResultItem { raw: "tech drones".into(), keyword: "tech drones".into(), score: 0.2767 },
+            ResultItem { raw: "weekly".into(), keyword: "weekly".into(), score: 0.3607 },
+            ResultItem { raw: "great deals".into(), keyword: "great deals".into(), score: 0.4456 },
         ];
         // LIIAD REFERENCE:
         // weekly newsletter 0.0780 (same)
-        // newsletter 0.2005 (much lower score than our implementation)
+        // newsletter 0.2005 (same)
+        // weekly 0.3607 (same)
+        // great deals 0.4456 (same)
+        // high-tech drones 0.4456
 
         // REASONS FOR DISCREPANCY:
         // - "high-tech" gets split into "high" and "tech" by unicode segmentation
-        // - issue with multi-word ngrams - the constitutent words get different scores compared to LIAAD/yake
 
         assert_eq!(actual, expected);
     }
@@ -790,36 +788,21 @@ mod tests {
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected: Results = vec![
-            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0478 },
-            ResultItem { raw: "data science".into(), keyword: "data science".into(), score: 0.0537 },
-            ResultItem { raw: "acquiring data science".into(), keyword: "acquiring data science".into(), score: 0.058 },
-            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0732 },
-            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.0908 },
+            ResultItem { raw: "Google".into(), keyword: "google".into(), score: 0.025 }, // LIAAD REFERENCE: 0.0251
+            ResultItem { raw: "Kaggle".into(), keyword: "kaggle".into(), score: 0.0272 }, // LIAAD REFERENCE: 0.0273
+            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0478 }, // LIAAD REFERENCE: 0.0483
+            ResultItem { raw: "data science".into(), keyword: "data science".into(), score: 0.0537 }, // LIAAD REFERENCE: 0.0550
+            ResultItem { raw: "acquiring data science".into(), keyword: "acquiring data science".into(), score: 0.058 }, // LIAAD REFERENCE: 0.0603
+            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0732 }, // LIAAD REFERENCE: 0.0746
+            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.0793 }, // LIAAD REFERENCE: 0.0800
+            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.0908 }, // LIAAD REFERENCE: 0.0914
             ResultItem {
                 raw: "Anthony Goldbloom declined".into(),
                 keyword: "anthony goldbloom declined".into(),
                 score: 0.0957,
-            },
-            ResultItem {
-                raw: "science community Kaggle".into(),
-                keyword: "science community kaggle".into(),
-                score: 0.0985,
-            },
-            ResultItem { raw: "Google Cloud".into(), keyword: "google cloud".into(), score: 0.1126 },
-            ResultItem { raw: "founder CEO Anthony".into(), keyword: "founder ceo anthony".into(), score: 0.1142 },
-            ResultItem { raw: "acquiring Kaggle".into(), keyword: "acquiring kaggle".into(), score: 0.1181 },
+            }, // LIAAD REFERENCE: 0.0974
+            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0972 }, // LIAAD REFERENCE: 0.0983
         ];
-        // LIAAD REFERENCE:
-        // Google 0.0251
-        // Kaggle 0.0273
-        // CEO Anthony Goldbloom 0.0483
-        // data science 0.0550
-        // acquiring data science 0.0603
-        // Google Cloud Platform 0.0746
-        // data 0.0800
-        // San Francisco 0.0914
-        // Anthony Goldbloom declined 0.0974
-        // science 0.0983
 
         assert_eq!(actual, expected);
     }

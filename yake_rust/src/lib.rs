@@ -7,10 +7,10 @@ use std::iter::FromIterator;
 use std::ops::Deref;
 
 use indexmap::IndexMap;
+use preprocessor::{split_into_sentences, split_into_words};
 use stats::{mean, median, stddev};
 
 use crate::levenshtein::levenshtein_ratio;
-use crate::preprocessor::PreprocessorCfg;
 pub use crate::stopwords::StopWords;
 
 mod levenshtein;
@@ -162,13 +162,13 @@ impl Yake {
 
     pub fn get_n_best(&self, text: &str, n: Option<usize>) -> Vec<ResultItem> {
         let sentences = self.preprocess_text(text);
-        let mut ngrams: Candidates = self.ngram_selection(self.config.ngrams, &sentences);
-        self.filter_candidates(&mut ngrams, None, None, None, None);
 
-        self.candidate_selection(&mut ngrams);
-        let vocabulary = self.build_vocabulary(&sentences);
         let context = self.build_context(&sentences);
+        let vocabulary = self.build_vocabulary(&sentences);
         let features = self.extract_features(&context, vocabulary, &sentences);
+
+        let mut ngrams: Candidates = self.ngram_selection(self.config.ngrams, &sentences);
+        self.filter_candidates(&mut ngrams, 3, 2, 5, false);
         let weighted_candidates = self.candidate_weighting(features, context, ngrams);
 
         let mut results = weighted_candidates
@@ -212,25 +212,14 @@ impl Yake {
     }
 
     fn preprocess_text(&self, text: &str) -> Sentences {
-        let cfg = PreprocessorCfg::default();
-        preprocessor::split_into_sentences(text, &cfg)
+        split_into_sentences(text)
             .into_iter()
             .map(|sentence| {
-                let words = preprocessor::split_into_words(&sentence, &cfg);
+                let words = split_into_words(&sentence);
                 let stems = words.iter().map(|w| w.to_lowercase()).collect();
                 Sentence { length: words.len(), words, stems }
             })
             .collect()
-    }
-
-    fn candidate_selection<'s>(&self, candidates: &mut Candidates<'s>) -> () {
-        candidates.retain(|_k, v| !{
-            let first_surf_form = &v.surface_forms[0];
-            let (fst, lst) = (&first_surf_form[0], first_surf_form.last().unwrap());
-
-            // remove candidate if
-            fst.len() < 3 || lst.len() < 3
-        });
     }
 
     fn build_vocabulary<'s>(&self, sentences: &'s [Sentence]) -> Words<'s> {
@@ -462,21 +451,15 @@ impl Yake {
     fn filter_candidates(
         &self,
         candidates: &mut Candidates,
-        minimum_length: Option<usize>,
-        minimum_word_size: Option<usize>,
-        maximum_word_number: Option<usize>,
-        only_alphanum: Option<bool>,
+        minimum_length: usize,
+        minimum_word_size: usize,
+        maximum_word_number: usize,
+        only_alphanumeric_and_hyphen: bool, // could be a function
     ) {
-        let minimum_length = minimum_length.unwrap_or(3);
-        let minimum_word_size = minimum_word_size.unwrap_or(2);
-        let maximum_word_number = maximum_word_number.unwrap_or(5);
-        let only_alphanum = only_alphanum.unwrap_or(false); // fixme: replace with a function
+        let word_has_punctuation =
+            |word: &String| HashSet::from_iter(word.chars()).intersection(&self.config.punctuation).next().is_some();
 
-        let in_char_set = |word: &str| word.chars().all(|ch| ch.is_alphanumeric() || ch == '-');
-        let is_punctuation =
-            |word: &str| HashSet::from_iter(word.chars()).intersection(&self.config.punctuation).next().is_some();
-
-        // fixme: filter right before inserting into the set
+        // fixme: filter right before inserting into the set to optimize
         candidates.retain(|_k, v| !{
             // get the words from the first occurring surface form
             let first_surf_form = v.surface_forms[0];
@@ -484,10 +467,11 @@ impl Yake {
 
             let has_float = || words.iter().any(|w| w.parse::<f64>().is_ok());
             let has_stop_word = || words.intersection(&self.stop_words).next().is_some();
-            let has_punctuation = || words.iter().any(|w| is_punctuation(w));
+            let has_punctuation = || words.iter().any(word_has_punctuation);
             let not_enough_symbols = || words.iter().map(|w| w.len()).sum::<usize>() < minimum_length;
             let has_too_short_word = || words.iter().map(|w| w.len()).min().unwrap_or(0) < minimum_word_size;
-            let has_non_alphanumeric = || only_alphanum && words.iter().any(|w| !in_char_set(w));
+            let has_non_alphanumeric =
+                || only_alphanumeric_and_hyphen && !words.iter().all(word_is_alphanumeric_and_hyphen);
 
             // remove candidate if
             has_float()
@@ -497,6 +481,8 @@ impl Yake {
                 || has_too_short_word()
                 || v.lexical_form.len() > maximum_word_number
                 || has_non_alphanumeric()
+                || first_surf_form[0].len() < 3 // fixme: magic constant
+                || first_surf_form.last().unwrap().len() < 3
         });
     }
 
@@ -524,6 +510,10 @@ impl Yake {
         }
         candidates
     }
+}
+
+fn word_is_alphanumeric_and_hyphen(word: impl AsRef<str>) -> bool {
+    word.as_ref().chars().all(|ch| ch.is_alphanumeric() || ch == '-')
 }
 
 trait PluralHelper {

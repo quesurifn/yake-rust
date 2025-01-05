@@ -1,15 +1,6 @@
 use unicode_segmentation::UnicodeSegmentation;
 
-#[allow(dead_code)]
-#[derive(Debug, Default, Clone)]
-pub struct PreprocessorCfg {
-    #[deprecated = "not implemented yet"]
-    pub ignore_urls: bool,
-    #[deprecated = "not implemented yet"]
-    pub expand_contractions: bool,
-}
-
-pub fn split_into_words(text: &str, _cfg: &PreprocessorCfg) -> Vec<String> {
+pub fn split_into_words(text: &str) -> Vec<String> {
     text.split_word_bounds()
         .map(str::trim)
         .filter(|s| !s.is_empty())
@@ -17,7 +8,7 @@ pub fn split_into_words(text: &str, _cfg: &PreprocessorCfg) -> Vec<String> {
         .collect()
 }
 
-pub fn split_into_sentences(text: &str, _cfg: &PreprocessorCfg) -> Vec<String> {
+pub fn split_into_sentences(text: &str) -> Vec<String> {
     text.trim()
         .replace("\n", "")
         .replace("\t", "")

@@ -282,8 +282,7 @@ impl Yake {
         let tf = words.values().map(Vec::len);
         let tf_nsw = words
             .iter()
-            // fixme: add len < 3 for stopwords
-            .filter_map(|(k, v)| if !self.stop_words.contains(&k.to_owned()) { Some(v.len()) } else { None })
+            .filter_map(|(k, v)| if !self.stop_words.contain(&k.to_owned()) { Some(v.len()) } else { None })
             .map(|x| x as f64)
             .collect::<Vec<_>>();
 
@@ -295,7 +294,7 @@ impl Yake {
 
         for (key, occurrences) in words.into_iter() {
             let mut cand = YakeCandidate {
-                is_stopword: self.stop_words.contains(&key) || key.len() < 3,
+                is_stopword: self.stop_words.contain(&key),
                 tf: occurrences.len() as f64,
                 ..Default::default()
             };
@@ -463,10 +462,10 @@ impl Yake {
         candidates.retain(|_k, v| !{
             // get the words from the first occurring surface form
             let first_surf_form = v.surface_forms[0];
-            let words: HashSet<String> = HashSet::from_iter(first_surf_form.iter().map(|w| w.to_lowercase()));
+            let words: HashSet<LString> = HashSet::from_iter(first_surf_form.iter().map(|w| w.to_lowercase()));
 
             let has_float = || words.iter().any(|w| w.parse::<f64>().is_ok());
-            let has_stop_word = || words.intersection(&self.stop_words).next().is_some();
+            let has_stop_word = || self.stop_words.intersect_with(&words);
             let has_punctuation = || words.iter().any(word_has_punctuation);
             let not_enough_symbols = || words.iter().map(|w| w.len()).sum::<usize>() < minimum_length;
             let has_too_short_word = || words.iter().map(|w| w.len()).min().unwrap_or(0) < minimum_word_size;
@@ -746,14 +745,14 @@ mod tests {
         let expected: Results = vec![
             ResultItem { raw: "Google".into(), keyword: "google".into(), score: 0.025 }, // LIAAD REFERENCE: 0.0251
             ResultItem { raw: "Kaggle".into(), keyword: "kaggle".into(), score: 0.0272 }, // LIAAD REFERENCE: 0.0273
-            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.0793 },    // LIAAD REFERENCE: 0.0800
-            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0972 }, // LIAAD REFERENCE: 0.0983
-            ResultItem { raw: "platform".into(), keyword: "platform".into(), score: 0.1233 }, // LIAAD REFERENCE: 0.1240
-            ResultItem { raw: "service".into(), keyword: "service".into(), score: 0.1306 }, // LIAAD REFERENCE: 0.1316
-            ResultItem { raw: "acquiring".into(), keyword: "acquiring".into(), score: 0.1494 }, // LIAAD REFERENCE: 0.1511
-            ResultItem { raw: "competition".into(), keyword: "competition".into(), score: 0.153 }, // Not in top 9 of LIAAD/yake
-            ResultItem { raw: "Goldbloom".into(), keyword: "goldbloom".into(), score: 0.1619 }, // LIAAD REFERENCE: 0.1625
-            ResultItem { raw: "machine".into(), keyword: "machine".into(), score: 0.1708 }, // LIAAD REFERENCE: 0.1625
+            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.0795 },    // LIAAD REFERENCE: 0.0800
+            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0975 }, // LIAAD REFERENCE: 0.0983
+            ResultItem { raw: "platform".into(), keyword: "platform".into(), score: 0.1235 }, // LIAAD REFERENCE: 0.1240
+            ResultItem { raw: "service".into(), keyword: "service".into(), score: 0.1309 }, // LIAAD REFERENCE: 0.1316
+            ResultItem { raw: "acquiring".into(), keyword: "acquiring".into(), score: 0.1499 }, // LIAAD REFERENCE: 0.1511
+            ResultItem { raw: "competition".into(), keyword: "competition".into(), score: 0.1533 }, // Not in top 9 of LIAAD/yake
+            ResultItem { raw: "Goldbloom".into(), keyword: "goldbloom".into(), score: 0.1621 }, // LIAAD REFERENCE: 0.1625
+            ResultItem { raw: "machine".into(), keyword: "machine".into(), score: 0.1712 }, // LIAAD REFERENCE: 0.1625
         ];
 
         assert_eq!(actual, expected);
@@ -769,18 +768,22 @@ mod tests {
         let expected: Results = vec![
             ResultItem { raw: "Google".into(), keyword: "google".into(), score: 0.025 }, // LIAAD REFERENCE: 0.0251
             ResultItem { raw: "Kaggle".into(), keyword: "kaggle".into(), score: 0.0272 }, // LIAAD REFERENCE: 0.0273
-            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0478 }, // LIAAD REFERENCE: 0.0483
-            ResultItem { raw: "data science".into(), keyword: "data science".into(), score: 0.0537 }, // LIAAD REFERENCE: 0.0550
-            ResultItem { raw: "acquiring data science".into(), keyword: "acquiring data science".into(), score: 0.058 }, // LIAAD REFERENCE: 0.0603
-            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0732 }, // LIAAD REFERENCE: 0.0746
-            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.0793 }, // LIAAD REFERENCE: 0.0800
-            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.0908 }, // LIAAD REFERENCE: 0.0914
+            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.048 }, // LIAAD REFERENCE: 0.0483
+            ResultItem { raw: "data science".into(), keyword: "data science".into(), score: 0.0541 }, // LIAAD REFERENCE: 0.0550
+            ResultItem {
+                raw: "acquiring data science".into(),
+                keyword: "acquiring data science".into(),
+                score: 0.0587,
+            }, // LIAAD REFERENCE: 0.0603
+            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0737 }, // LIAAD REFERENCE: 0.0746
+            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.0795 }, // LIAAD REFERENCE: 0.0800
+            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.091 }, // LIAAD REFERENCE: 0.0914
             ResultItem {
                 raw: "Anthony Goldbloom declined".into(),
                 keyword: "anthony goldbloom declined".into(),
-                score: 0.0957,
+                score: 0.0962,
             }, // LIAAD REFERENCE: 0.0974
-            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0972 }, // LIAAD REFERENCE: 0.0983
+            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0975 }, // LIAAD REFERENCE: 0.0983
         ];
 
         assert_eq!(actual, expected);

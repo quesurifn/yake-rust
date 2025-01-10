@@ -101,20 +101,12 @@ impl StopWords {
     }
 }
 
-impl Deref for StopWords {
-    type Target = HashSet<LString>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.set
+impl StopWords {
+    pub fn contain(&self, word: &str) -> bool {
+        word.len() < 3 || self.set.contains(word)
     }
-}
 
-impl<T> AsRef<T> for StopWords
-where
-    T: ?Sized,
-    <StopWords as Deref>::Target: AsRef<T>,
-{
-    fn as_ref(&self) -> &T {
-        self.deref().as_ref()
+    pub fn intersect_with(&self, words: &HashSet<LString>) -> bool {
+        self.set.intersection(words).next().is_some() || words.iter().any(|w| w.len() < 3)
     }
 }

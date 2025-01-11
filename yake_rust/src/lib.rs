@@ -722,6 +722,27 @@ mod tests {
     }
 
     #[test]
+    fn weekly_newsletter_long_with_paragraphs() {
+        let text = "This is your weekly newsletter!\n\n \
+            \tHundreds of great deals - everything from men's fashion \n\
+            to high-tech drones!";
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(5));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "weekly newsletter".into(), keyword: "weekly newsletter".into(), score: 0.0780 },
+            ResultItem { raw: "newsletter".into(), keyword: "newsletter".into(), score: 0.2005 },
+            ResultItem { raw: "weekly".into(), keyword: "weekly".into(), score: 0.3607 },
+            ResultItem { raw: "great deals".into(), keyword: "great deals".into(), score: 0.4456 },
+            ResultItem { raw: "high-tech drones".into(), keyword: "high-tech drones".into(), score: 0.4456 },
+        ];
+        // Results agree with reference implementation LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
+    
+    #[test]
     fn google_sample_single_ngram() {
         let text = include_str!("test_google.txt"); // LIAAD/yake sample text
         let stopwords = StopWords::predefined("en").unwrap();

@@ -230,8 +230,8 @@ impl Yake {
 
             for (w_idx, word) in sentence.words.iter().enumerate() {
                 if !word.is_empty()
-                    && word.chars().all(char::is_alphanumeric)
-                    && HashSet::from_iter(word.chars()).intersection(&self.config.punctuation).next().is_none()
+                    && word_is_alphanumeric_and_hyphen(word)
+                    && !HashSet::from_iter(word.chars()).is_subset(&self.config.punctuation)
                 {
                     let index = word.to_lowercase();
                     let occurrence = Occurrence { shift_offset: shift + w_idx, idx, word, shift };
@@ -455,8 +455,7 @@ impl Yake {
         maximum_word_number: usize,
         only_alphanumeric_and_hyphen: bool, // could be a function
     ) {
-        let word_has_punctuation =
-            |word: &String| HashSet::from_iter(word.chars()).intersection(&self.config.punctuation).next().is_some();
+        let word_is_punctuation = |word: &String| HashSet::from_iter(word.chars()).is_subset(&self.config.punctuation);
 
         // fixme: filter right before inserting into the set to optimize
         candidates.retain(|_k, v| !{
@@ -466,7 +465,7 @@ impl Yake {
 
             let has_float = || words.iter().any(|w| w.parse::<f64>().is_ok());
             let has_stop_word = || self.stop_words.intersect_with(&words);
-            let has_punctuation = || words.iter().any(word_has_punctuation);
+            let is_punctuation = || words.iter().any(word_is_punctuation);
             let not_enough_symbols = || words.iter().map(|w| w.len()).sum::<usize>() < minimum_length;
             let has_too_short_word = || words.iter().map(|w| w.len()).min().unwrap_or(0) < minimum_word_size;
             let has_non_alphanumeric =
@@ -475,7 +474,7 @@ impl Yake {
             // remove candidate if
             has_float()
                 || has_stop_word()
-                || has_punctuation()
+                || is_punctuation()
                 || not_enough_symbols()
                 || has_too_short_word()
                 || v.lexical_form.len() > maximum_word_number
@@ -677,14 +676,9 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(1));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![ResultItem { raw: "tech".into(), keyword: "tech".into(), score: 0.0449 }];
-
-        // LIAAD REFERENCE:
-        // high-tech 0.1583
-
-        // REASONS FOR DISCREPANCY:
-        // - unicode-segmentation splits by hyphen, segtok does not. This choice is intentional
-        //   by unicode-segmentation, and segtok's successor syntok also splits by hyphen.
+        let expected: Results =
+            vec![ResultItem { raw: "high-tech".into(), keyword: "high-tech".into(), score: 0.1583 }];
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }
@@ -718,19 +712,11 @@ mod tests {
         let expected: Results = vec![
             ResultItem { raw: "weekly newsletter".into(), keyword: "weekly newsletter".into(), score: 0.0780 },
             ResultItem { raw: "newsletter".into(), keyword: "newsletter".into(), score: 0.2005 },
-            ResultItem { raw: "tech drones".into(), keyword: "tech drones".into(), score: 0.2767 },
             ResultItem { raw: "weekly".into(), keyword: "weekly".into(), score: 0.3607 },
             ResultItem { raw: "great deals".into(), keyword: "great deals".into(), score: 0.4456 },
+            ResultItem { raw: "high-tech drones".into(), keyword: "high-tech drones".into(), score: 0.4456 },
         ];
-        // LIIAD REFERENCE:
-        // weekly newsletter 0.0780 (same)
-        // newsletter 0.2005 (same)
-        // weekly 0.3607 (same)
-        // great deals 0.4456 (same)
-        // high-tech drones 0.4456
-
-        // REASONS FOR DISCREPANCY:
-        // - "high-tech" gets split into "high" and "tech" by unicode segmentation
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }
@@ -745,14 +731,14 @@ mod tests {
         let expected: Results = vec![
             ResultItem { raw: "Google".into(), keyword: "google".into(), score: 0.025 }, // LIAAD REFERENCE: 0.0251
             ResultItem { raw: "Kaggle".into(), keyword: "kaggle".into(), score: 0.0272 }, // LIAAD REFERENCE: 0.0273
-            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.0795 },    // LIAAD REFERENCE: 0.0800
-            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0975 }, // LIAAD REFERENCE: 0.0983
-            ResultItem { raw: "platform".into(), keyword: "platform".into(), score: 0.1235 }, // LIAAD REFERENCE: 0.1240
-            ResultItem { raw: "service".into(), keyword: "service".into(), score: 0.1309 }, // LIAAD REFERENCE: 0.1316
-            ResultItem { raw: "acquiring".into(), keyword: "acquiring".into(), score: 0.1499 }, // LIAAD REFERENCE: 0.1511
-            ResultItem { raw: "competition".into(), keyword: "competition".into(), score: 0.1533 }, // Not in top 9 of LIAAD/yake
-            ResultItem { raw: "Goldbloom".into(), keyword: "goldbloom".into(), score: 0.1621 }, // LIAAD REFERENCE: 0.1625
-            ResultItem { raw: "machine".into(), keyword: "machine".into(), score: 0.1712 }, // LIAAD REFERENCE: 0.1625
+            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.0794 },    // LIAAD REFERENCE: 0.0800
+            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0974 }, // LIAAD REFERENCE: 0.0983
+            ResultItem { raw: "platform".into(), keyword: "platform".into(), score: 0.1234 }, // LIAAD REFERENCE: 0.1240
+            ResultItem { raw: "service".into(), keyword: "service".into(), score: 0.1308 }, // LIAAD REFERENCE: 0.1316
+            ResultItem { raw: "acquiring".into(), keyword: "acquiring".into(), score: 0.1496 }, // LIAAD REFERENCE: 0.1511
+            ResultItem { raw: "Goldbloom".into(), keyword: "goldbloom".into(), score: 0.162 }, // LIAAD REFERENCE: 0.1625
+            ResultItem { raw: "machine".into(), keyword: "machine".into(), score: 0.171 }, // LIAAD REFERENCE: 0.1672
+            ResultItem { raw: "learning".into(), keyword: "learning".into(), score: 0.171 }, // LIAAD REFERENCE: 0.1621 (so should be ranked higher)
         ];
 
         assert_eq!(actual, expected);
@@ -768,22 +754,22 @@ mod tests {
         let expected: Results = vec![
             ResultItem { raw: "Google".into(), keyword: "google".into(), score: 0.025 }, // LIAAD REFERENCE: 0.0251
             ResultItem { raw: "Kaggle".into(), keyword: "kaggle".into(), score: 0.0272 }, // LIAAD REFERENCE: 0.0273
-            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.048 }, // LIAAD REFERENCE: 0.0483
-            ResultItem { raw: "data science".into(), keyword: "data science".into(), score: 0.0541 }, // LIAAD REFERENCE: 0.0550
+            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0479 }, // LIAAD REFERENCE: 0.0483
+            ResultItem { raw: "data science".into(), keyword: "data science".into(), score: 0.0539 }, // LIAAD REFERENCE: 0.0550
             ResultItem {
                 raw: "acquiring data science".into(),
                 keyword: "acquiring data science".into(),
-                score: 0.0587,
+                score: 0.0583,
             }, // LIAAD REFERENCE: 0.0603
-            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0737 }, // LIAAD REFERENCE: 0.0746
-            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.0795 }, // LIAAD REFERENCE: 0.0800
-            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.091 }, // LIAAD REFERENCE: 0.0914
+            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0734 }, // LIAAD REFERENCE: 0.0746
+            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.0794 }, // LIAAD REFERENCE: 0.0800
+            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.0909 }, // LIAAD REFERENCE: 0.0914
             ResultItem {
                 raw: "Anthony Goldbloom declined".into(),
                 keyword: "anthony goldbloom declined".into(),
-                score: 0.0962,
+                score: 0.0959,
             }, // LIAAD REFERENCE: 0.0974
-            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0975 }, // LIAAD REFERENCE: 0.0983
+            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0974 }, // LIAAD REFERENCE: 0.0983
         ];
 
         assert_eq!(actual, expected);

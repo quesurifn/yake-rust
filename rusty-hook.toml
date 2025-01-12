@@ -1,0 +1,8 @@
+# https://github.com/swellaby/rusty-hook
+# $ rusty-hook init
+
+[hooks]
+pre-commit = 'bash ./shortcuts/pre-commit-hook.sh'
+
+[logging]
+verbose = false

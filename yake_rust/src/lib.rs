@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 use std::ops::Deref;
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use preprocessor::{split_into_sentences, split_into_words};
 use stats::{mean, median, stddev};
 
@@ -191,6 +191,14 @@ impl Yake {
         }
     }
 
+    fn get_unique_term(&self, word: &str) -> String {
+        let mut unique_term = word.to_lowercase().to_single();
+        for punctuation_symbol in &self.config.punctuation {
+            unique_term = unique_term.replace(*punctuation_symbol, "");
+        }
+        unique_term
+    }
+
     fn remove_duplicates(&self, results: Vec<ResultItem>, n: usize) -> Vec<ResultItem> {
         let mut unique: Vec<ResultItem> = Vec::new();
 
@@ -229,11 +237,8 @@ impl Yake {
             let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
 
             for (w_idx, word) in sentence.words.iter().enumerate() {
-                if !word.is_empty()
-                    && word_is_alphanumeric_and_hyphen(word)
-                    && !HashSet::from_iter(word.chars()).is_subset(&self.config.punctuation)
-                {
-                    let index = word.to_lowercase();
+                if !word.is_empty() && !HashSet::from_iter(word.chars()).is_subset(&self.config.punctuation) {
+                    let index = self.get_unique_term(&word);
                     let occurrence = Occurrence { shift_offset: shift + w_idx, idx, word, shift };
                     words.entry(index).or_default().push(occurrence)
                 }
@@ -251,25 +256,25 @@ impl Yake {
 
         for sentence in sentences {
             let mut buffer: Vec<LString> = Vec::new();
-            let snt_words: Vec<LString> = sentence.words.iter().map(|w| w.to_lowercase()).collect();
 
-            for snt_word in snt_words {
+            for snt_word in &sentence.words {
                 if HashSet::from_iter(snt_word.chars()).is_subset(&self.config.punctuation) {
                     buffer.clear();
                     continue;
                 }
+                let snt_key = self.get_unique_term(&snt_word);
 
                 let min_range = buffer.len().saturating_sub(self.config.window_size);
                 let max_range = buffer.len();
 
                 for buf_word in &buffer[min_range..max_range] {
-                    let entry_1 = contexts.entry(snt_word.clone()).or_default();
+                    let entry_1 = contexts.entry(snt_key.clone()).or_default();
                     entry_1.0.push(buf_word.clone());
 
                     let entry_2 = contexts.entry(buf_word.clone()).or_default();
                     entry_2.1.push(snt_word.clone());
                 }
-                buffer.push(snt_word);
+                buffer.push(snt_key);
             }
         }
 
@@ -280,21 +285,44 @@ impl Yake {
     /// to calculate the importance of single terms.
     fn extract_features<'s>(&self, contexts: &Contexts, words: Words<'s>, sentences: &'s Sentences) -> Features {
         let tf = words.values().map(Vec::len);
-        let tf_nsw = words
-            .iter()
-            .filter_map(|(k, v)| if !self.stop_words.contain(&k.to_owned()) { Some(v.len()) } else { None })
-            .map(|x| x as f64)
-            .collect::<Vec<_>>();
-
+        let mut words_nsw: HashMap<String, usize> = HashMap::new();
+        for sentence in sentences {
+            for word in &sentence.words {
+                if HashSet::from_iter(word.chars()).is_subset(&self.config.punctuation)
+                    || self.stop_words.contain(&word.to_lowercase())
+                {
+                    continue;
+                }
+                let key = &self.get_unique_term(&word);
+                if words_nsw.contains_key(key) {
+                    continue;
+                }
+                let occurrences: &Vec<Occurrence<'s>> = words.get(key).unwrap();
+                *words_nsw.entry(key.to_string()).or_default() = occurrences.len();
+            }
+        }
+        let tf_nsw = words_nsw.values().map(|x| *x as f64).collect::<Vec<_>>();
         let std_tf = stddev(tf_nsw.iter().copied());
         let mean_tf = mean(tf_nsw.iter().copied());
         let max_tf = tf.max().unwrap() as f64;
 
         let mut features = Features::new();
 
-        for (key, occurrences) in words.into_iter() {
+        let mut candidate_words: IndexSet<String> = IndexSet::new();
+        for sentence in sentences {
+            for word in &sentence.words {
+                if HashSet::from_iter(word.chars()).is_subset(&self.config.punctuation) {
+                    continue;
+                }
+                candidate_words.insert(word.to_string());
+            }
+        }
+        for word in candidate_words {
+            let key: String = self.get_unique_term(&word);
+            let occurrences = words.get(&key).unwrap();
+
             let mut cand = YakeCandidate {
-                is_stopword: self.stop_words.contain(&key),
+                is_stopword: self.stop_words.contain(&word.to_lowercase()),
                 tf: occurrences.len() as f64,
                 ..Default::default()
             };
@@ -381,7 +409,7 @@ impl Yake {
             cand.weight = (cand.relatedness * cand.position)
                 / (cand.casing + (cand.frequency / cand.relatedness) + (cand.sentences / cand.relatedness));
 
-            features.insert(key, cand);
+            features.insert(word.to_lowercase(), cand);
         }
 
         features
@@ -407,19 +435,31 @@ impl Yake {
                 for (j, token) in tokens.clone().enumerate() {
                     let Some(feat_cand) = features.get(&token) else { continue };
                     if feat_cand.is_stopword {
-                        let term_stop = token;
+                        let unique_term_stop = self.get_unique_term(&token);
                         let mut prob_t1 = 0.0;
                         let mut prob_t2 = 0.0;
                         if 1 < j {
                             let term_left = tokens.clone().nth(j - 1).unwrap();
-                            prob_t1 = contexts.get(&term_left).unwrap().1.iter().filter(|w| **w == term_stop).count()
-                                as f64
+                            let _unique_term_left = self.get_unique_term(&term_left);
+                            prob_t1 = contexts
+                                .get(&_unique_term_left)
+                                .unwrap()
+                                .1
+                                .iter()
+                                .filter(|w| **w == unique_term_stop)
+                                .count() as f64
                                 / features.get(&term_left).unwrap().tf;
                         }
                         if j + 1 < tokens.len() {
                             let term_right = tokens.clone().nth(j + 1).unwrap();
-                            prob_t2 = contexts.get(&term_stop).unwrap().0.iter().filter(|w| **w == term_right).count()
-                                as f64
+                            let _unique_term_right = self.get_unique_term(&term_right);
+                            prob_t2 = contexts
+                                .get(&unique_term_stop)
+                                .unwrap()
+                                .0
+                                .iter()
+                                .filter(|w| **w == _unique_term_right)
+                                .count() as f64
                                 / features.get(&term_right).unwrap().tf;
                         }
 
@@ -496,8 +536,10 @@ impl Yake {
                     let stems = &sentence.stems[j..k];
                     let sentence_id = idx;
                     let offset = j + shift;
+                    if stems.is_empty() {
+                        continue;
+                    }
                     let lexical_form = stems.join(" ");
-
                     let candidate = candidates.entry(lexical_form).or_default();
                     candidate.surface_forms.push(words);
                     candidate.sentence_ids.push(sentence_id);
@@ -639,18 +681,11 @@ mod tests {
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected: Results = vec![
-            ResultItem { raw: "smartwatch".into(), keyword: "smartwatch".into(), score: 0.1370 },
-            ResultItem { raw: "phone".into(), keyword: "phone".into(), score: 0.3553 },
-            ResultItem { raw: "phones".into(), keyword: "phones".into(), score: 0.4454 },
+            ResultItem { raw: "smartwatch".into(), keyword: "smartwatch".into(), score: 0.2025 },
+            ResultItem { raw: "phone".into(), keyword: "phone".into(), score: 0.4949 },
+            ResultItem { raw: "phones".into(), keyword: "phones".into(), score: 0.4949 },
         ];
-
-        // LIAAD REFERENCE:
-        // smartwatch 0.2025
-        // phone 0.4949
-        // phones 0.4949
-
-        // REASONS FOR DISCREPANCY:
-        // - LIAAD/yake does special handling of plural
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }
@@ -750,24 +785,21 @@ mod tests {
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected: Results = vec![
-            ResultItem { raw: "Google".into(), keyword: "google".into(), score: 0.025 }, // LIAAD REFERENCE: 0.0251
-            ResultItem { raw: "Kaggle".into(), keyword: "kaggle".into(), score: 0.0272 }, // LIAAD REFERENCE: 0.0273
-            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.0794 },    // LIAAD REFERENCE: 0.0800
-            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0974 }, // LIAAD REFERENCE: 0.0983
-            ResultItem { raw: "platform".into(), keyword: "platform".into(), score: 0.1234 }, // LIAAD REFERENCE: 0.1240
-            ResultItem { raw: "service".into(), keyword: "service".into(), score: 0.1308 }, // LIAAD REFERENCE: 0.1316
-            ResultItem { raw: "acquiring".into(), keyword: "acquiring".into(), score: 0.1496 }, // LIAAD REFERENCE: 0.1511
-            ResultItem { raw: "Goldbloom".into(), keyword: "goldbloom".into(), score: 0.162 }, // LIAAD REFERENCE: 0.1625
-            ResultItem { raw: "machine".into(), keyword: "machine".into(), score: 0.171 }, // LIAAD REFERENCE: 0.1672
-            ResultItem { raw: "learning".into(), keyword: "learning".into(), score: 0.171 }, // LIAAD REFERENCE: 0.1621 (so should be ranked higher)
+            ResultItem { raw: "Google".into(), keyword: "google".into(), score: 0.0251 },
+            ResultItem { raw: "Kaggle".into(), keyword: "kaggle".into(), score: 0.0273 },
+            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.08 },
+            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0983 },
+            ResultItem { raw: "platform".into(), keyword: "platform".into(), score: 0.124 },
+            ResultItem { raw: "service".into(), keyword: "service".into(), score: 0.1316 },
+            ResultItem { raw: "acquiring".into(), keyword: "acquiring".into(), score: 0.1511 },
+            ResultItem { raw: "Goldbloom".into(), keyword: "goldbloom".into(), score: 0.1625 },
+            ResultItem { raw: "machine".into(), keyword: "machine".into(), score: 0.1722 }, // LIAAD REFERENCE: 0.1672
+            ResultItem { raw: "learning".into(), keyword: "learning".into(), score: 0.1722 }, // LIAAD REFERENCE: 0.1621 (so should be ranked higher)
         ];
 
         // REASONS FOR DISCREPANCY:
-        // - LIIAD/yake counts plural the same as singular, so, e.g., "hosts" and "host" is the same
-        //   term when TFs are calculated, which affects the frequency contribution in the score.
-        //   (For example, LIIAD/yake has "competition"x5, yake-rust has "competition"x3 and "competitions"x2)
-        // - LIIAD/yake keeps numbers in the valid TFs which affect the frequency contribution in
-        //   the score (terms contributing to TF stats missing from yake-rust: "100,000", "12.5", "12.75")
+        // - "machine" and "learning" have different relatedness - in our code, they get one value; in LIAAD/yake, they
+        //   both have different values, none of which matches ours.
 
         assert_eq!(actual, expected);
     }
@@ -780,25 +812,26 @@ mod tests {
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected: Results = vec![
-            ResultItem { raw: "Google".into(), keyword: "google".into(), score: 0.025 }, // LIAAD REFERENCE: 0.0251
-            ResultItem { raw: "Kaggle".into(), keyword: "kaggle".into(), score: 0.0272 }, // LIAAD REFERENCE: 0.0273
-            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0479 }, // LIAAD REFERENCE: 0.0483
-            ResultItem { raw: "data science".into(), keyword: "data science".into(), score: 0.0539 }, // LIAAD REFERENCE: 0.0550
+            ResultItem { raw: "Google".into(), keyword: "google".into(), score: 0.0251 },
+            ResultItem { raw: "Kaggle".into(), keyword: "kaggle".into(), score: 0.0273 },
+            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0483 },
+            ResultItem { raw: "data science".into(), keyword: "data science".into(), score: 0.055 },
             ResultItem {
                 raw: "acquiring data science".into(),
                 keyword: "acquiring data science".into(),
-                score: 0.0583,
-            }, // LIAAD REFERENCE: 0.0603
-            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0734 }, // LIAAD REFERENCE: 0.0746
-            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.0794 }, // LIAAD REFERENCE: 0.0800
-            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.0909 }, // LIAAD REFERENCE: 0.0914
+                score: 0.0603,
+            },
+            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0746 },
+            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.08 },
+            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.0914 },
             ResultItem {
                 raw: "Anthony Goldbloom declined".into(),
                 keyword: "anthony goldbloom declined".into(),
-                score: 0.0959,
-            }, // LIAAD REFERENCE: 0.0974
-            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0974 }, // LIAAD REFERENCE: 0.0983
+                score: 0.0974,
+            },
+            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0983 },
         ];
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }

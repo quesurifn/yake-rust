@@ -380,7 +380,7 @@ impl Yake {
 
             cand.weight = (cand.relatedness * cand.position)
                 / (cand.casing + (cand.frequency / cand.relatedness) + (cand.sentences / cand.relatedness));
-    
+
             features.insert(key, cand);
         }
 
@@ -741,7 +741,7 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
-    
+
     #[test]
     fn google_sample_single_ngram() {
         let text = include_str!("test_google.txt"); // LIAAD/yake sample text

@@ -380,7 +380,7 @@ impl Yake {
 
             cand.weight = (cand.relatedness * cand.position)
                 / (cand.casing + (cand.frequency / cand.relatedness) + (cand.sentences / cand.relatedness));
-
+    
             features.insert(key, cand);
         }
 
@@ -761,6 +761,13 @@ mod tests {
             ResultItem { raw: "machine".into(), keyword: "machine".into(), score: 0.171 }, // LIAAD REFERENCE: 0.1672
             ResultItem { raw: "learning".into(), keyword: "learning".into(), score: 0.171 }, // LIAAD REFERENCE: 0.1621 (so should be ranked higher)
         ];
+
+        // REASONS FOR DISCREPANCY:
+        // - LIIAD/yake counts plural the same as singular, so, e.g., "hosts" and "host" is the same
+        //   term when TFs are calculated, which affects the frequency contribution in the score.
+        //   (For example, LIIAD/yake has "competition"x5, yake-rust has "competition"x3 and "competitions"x2)
+        // - LIIAD/yake keeps numbers in the valid TFs which affect the frequency contribution in
+        //   the score (terms contributing to TF stats missing from yake-rust: "100,000", "12.5", "12.75")
 
         assert_eq!(actual, expected);
     }

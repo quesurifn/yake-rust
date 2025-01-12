@@ -1,20 +1,16 @@
-# YAKE (Yet Another Keyword Extractor) RUST
+# YAKE (Yet Another Keyword Extractor) [![](https://img.shields.io/crates/v/yake-rust.svg)](https://crates.io/crates/yake-rust) [![](https://docs.rs/yake-rust/badge.svg)](https://docs.rs/yake-rust/)
 
-Yake is based on this paper: https://repositorio.inesctec.pt/server/api/core/bitstreams/ef121a01-a0a6-4be8-945d-3324a58fc944/content
+Yake is a language agnostic statistical keyword extractor weighing several factors such as acronyms, position in
+paragraph, capitalization, how many sentences the keyword appears in, stopwords, punctuation and more. Details are in these papers: [brief](https://doi.org/10.1016/j.ins.2019.09.013), [extended](https://repositorio.inesctec.pt/server/api/core/bitstreams/ef121a01-a0a6-4be8-945d-3324a58fc944/content).
 
-Yake is a language agnostic statistical keyword extractor weighing several factors such as acronyms, position in paragraph, capitalization, how many sentences the keyword appears in, stopwords, punctuation and more. 
+This crate is ported and is close as possible to the [reference implementation](https://github.com/LIAAD/yake/).
 
-
-
-## Example 
+## Example
 
 ```rust
-use yake_rust as keywords;
+use yake_rust::*;
 
 fn main() {
-    use std::time::Instant;
-    let now = Instant::now();
-
     let text = r#"
     Google is acquiring data science community Kaggle. Sources tell us that Google is acquiring Kaggle, a platform that hosts data science and machine learning 
     competitions. Details about the transaction remain somewhat vague, but given that Google is hosting its Cloud 
@@ -40,68 +36,28 @@ fn main() {
     Google chief economist Hal Varian, Khosla Ventures and Yuri Milner 
     "#;
 
-    let kwds = keywords::Yake::new(None, None).get_n_best(text.to_string(), Some(30));
+    let now = std::time::Instant::now();
 
-    println!("{:?}", kwds);
-    let elapsed = now.elapsed();
-    println!("Elapsed: {:.2?}", elapsed); 
+    let keywords = 
+        Yake::new(StopWords::predefined("en").unwrap(), Config::default())
+            .get_n_best(text, Some(10));
+
+    println!("{:?}", keywords);
+    println!("Elapsed: {:.2?}", now.elapsed());
 }
-
 ```
 
-Result: 
+Results:
 
-```json
-[
-  {
-    "keyword": "kaggle",
-    "raw": "Kaggle",
-    "score": 0.20846279315962324
-  },
-  {
-    "keyword": "google",
-    "raw": "Google",
-    "score": 0.23676437642810488
-  },
-  {
-    "keyword": "acquiring kaggle",
-    "raw": "acquiring Kaggle",
-    "score": 0.3017882425537463
-  },
-  {
-    "keyword": "data science",
-    "raw": "data science",
-    "score": 0.30873986543219967
-  },
-  {
-    "keyword": "google cloud",
-    "raw": "Google Cloud",
-    "score": 0.40955463454967833
-  },
-  {
-    "keyword": "google cloud platform",
-    "raw": "Google Cloud Platform",
-    "score": 0.5018536215405839
-  },
-  {
-    "keyword": "acquiring data science",
-    "raw": "acquiring data science",
-    "score": 0.5494143207629893
-  },
-  {
-    "keyword": "san francisco",
-    "raw": "San Francisco",
-    "score": 0.7636151899513093
-  },
-  {
-    "keyword": "ceo anthony goldbloom",
-    "raw": "CEO Anthony Goldbloom",
-    "score": 0.8166005339007906
-  },
-  {
-    "keyword": "science community kaggle",
-    "raw": "science community Kaggle",
-    "score": 0.8690005548383123
-  }
-]
-```
+| keyword                  | raw                      | score               |
+|--------------------------|--------------------------|---------------------|
+| kaggle                   | Kaggle                   | 0.20846279315962324 |
+| google                   | Google                   | 0.23676437642810488 |
+| acquiring kaggle         | acquiring Kaggle         | 0.3017882425537463  |
+| data science             | data science             | 0.30873986543219967 |
+| google cloud             | Google Cloud             | 0.40955463454967833 |
+| google cloud platform    | Google Cloud Platform    | 0.5018536215405839  |
+| acquiring data science   | acquiring data science   | 0.5494143207629893  |
+| san francisco            | San Francisco            | 0.7636151899513093  |
+| ceo anthony goldbloom    | CEO Anthony Goldbloom    | 0.8166005339007906  |
+| science community kaggle | science community Kaggle | 0.8690005548383123  |

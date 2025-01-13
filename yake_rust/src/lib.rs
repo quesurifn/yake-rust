@@ -22,16 +22,16 @@ type LString = String;
 
 type Sentences = Vec<Sentence>;
 /// Key is `stems.join(" ")`
-type Candidates<'s> = IndexMap<LString, PreCandidate<'s>>;
-type Features = HashMap<LString, YakeCandidate>;
+type Candidates<'s> = IndexMap<&'s [LString], PreCandidate<'s>>;
+type Features<'s> = HashMap<&'s LString, YakeCandidate>;
 type Words<'s> = HashMap<LString, Vec<Occurrence<'s>>>;
 type Contexts = HashMap<LString, (Vec<LString>, Vec<LString>)>;
 
-struct WeightedCandidates {
-    final_weights: IndexMap<LString, f64>,
-    surface_to_lexical: HashMap<LString, String>,
+struct WeightedCandidates<'s> {
+    final_weights: IndexMap<&'s [LString], f64>,
+    surface_to_lexical: HashMap<&'s [LString], &'s [LString]>,
     contexts: Contexts,
-    raw_lookup: HashMap<LString, String>,
+    raw_lookup: HashMap<&'s [LString], &'s [String]>,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug)]
@@ -110,11 +110,11 @@ struct Sentence {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-struct PreCandidate<'sentence> {
-    pub surfaces: Vec<&'sentence [String]>,
-    pub lc_surfaces: Vec<&'sentence [LString]>,
-    /// Is the latest from lc_words
-    pub lexical_form: &'sentence [LString],
+struct PreCandidate<'s> {
+    pub surfaces: Vec<&'s [String]>,
+    pub lc_surfaces: Vec<&'s [LString]>,
+    /// Is the latest from lc_words. todo: replace with lc_surfaces.last()
+    pub lexical_form: &'s [LString],
     pub offsets: Vec<usize>,
     pub sentence_ids: Vec<usize>,
 }
@@ -179,7 +179,8 @@ impl Yake {
             .final_weights
             .into_iter()
             .map(|(keyword, score)| {
-                let raw = weighted_candidates.raw_lookup.get(&keyword).unwrap().to_string();
+                let raw = weighted_candidates.raw_lookup.get(&keyword).unwrap().join(" ");
+                let keyword = keyword.join(" ");
                 ResultItem { raw, keyword, score }
             })
             .collect::<Vec<_>>();
@@ -288,7 +289,7 @@ impl Yake {
 
     /// Computes local statistic features that extract informative content within the text
     /// to calculate the importance of single terms.
-    fn extract_features<'s>(&self, contexts: &Contexts, words: Words<'s>, sentences: &'s Sentences) -> Features {
+    fn extract_features<'s>(&self, contexts: &Contexts, words: Words<'s>, sentences: &'s Sentences) -> Features<'s> {
         let tf = words.values().map(Vec::len);
 
         let words_nsw: HashMap<String, usize> = sentences
@@ -408,26 +409,25 @@ impl Yake {
             cand.weight = (cand.relatedness * cand.position)
                 / (cand.casing + (cand.frequency / cand.relatedness) + (cand.sentences / cand.relatedness));
 
-            features.insert(lc_word.clone(), cand);
+            features.insert(lc_word, cand);
         }
 
         features
     }
 
-    fn candidate_weighting(
+    fn candidate_weighting<'s>(
         &self,
         features: Features,
         contexts: Contexts,
-        candidates: Candidates,
-    ) -> WeightedCandidates {
-        let mut final_weights: IndexMap<String, f64> = IndexMap::new();
+        candidates: Candidates<'s>,
+    ) -> WeightedCandidates<'s> {
+        let mut final_weights: IndexMap<&'s [String], f64> = IndexMap::new();
         let mut surface_to_lexical = HashMap::new();
         let mut raw_lookup = HashMap::new();
 
         for (_k, v) in candidates {
-            let lc_surfaces = v.lc_surfaces.iter().map(|w| w.join(" ") as LString);
-            for (idx, candidate) in lc_surfaces.enumerate() {
-                let tokens = v.lc_surfaces[idx];
+            for candidate in v.lc_surfaces {
+                let tokens = candidate;
                 let mut prod_ = 1.0;
                 let mut sum_ = 0.0;
 
@@ -467,9 +467,9 @@ impl Yake {
                 let tf = v.surfaces.len() as f64;
                 let weight = prod_ / (tf * (1.0 + sum_));
 
-                final_weights.insert(candidate.clone(), weight);
-                surface_to_lexical.insert(candidate.clone(), v.lexical_form.join(" "));
-                raw_lookup.insert(candidate.clone(), v.surfaces[0].join(" ").clone());
+                final_weights.insert(candidate, weight);
+                surface_to_lexical.insert(candidate, v.lexical_form);
+                raw_lookup.insert(candidate, v.surfaces[0]);
             }
         }
 
@@ -512,7 +512,7 @@ impl Yake {
     }
 
     fn ngram_selection<'s>(&self, n: usize, sentences: &'s Sentences) -> Candidates<'s> {
-        let mut candidates: IndexMap<String, PreCandidate<'_>> = Candidates::new();
+        let mut candidates: IndexMap<&'s [LString], PreCandidate<'_>> = Candidates::new();
         for (idx, sentence) in sentences.iter().enumerate() {
             let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
 
@@ -524,8 +524,7 @@ impl Yake {
                         continue;
                     }
 
-                    let lexical_form = lc_words.join(" ");
-                    let candidate = candidates.entry(lexical_form).or_default();
+                    let candidate = candidates.entry(lc_words).or_default();
                     candidate.surfaces.push(words);
                     candidate.lc_surfaces.push(lc_words);
                     candidate.sentence_ids.push(idx);

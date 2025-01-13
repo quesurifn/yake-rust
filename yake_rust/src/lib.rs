@@ -105,13 +105,15 @@ pub struct ResultItem {
 struct Sentence {
     pub words: Vec<String>,
     pub is_punctuation: Vec<bool>,
-    pub stems: Vec<LString>,
+    pub lc_words: Vec<LString>,
     pub length: usize,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct PreCandidate<'sentence> {
-    pub surface_forms: Vec<&'sentence [String]>,
+    pub surfaces: Vec<&'sentence [String]>,
+    pub lc_surfaces: Vec<&'sentence [LString]>,
+    /// Is the latest from lc_words
     pub lexical_form: &'sentence [LString],
     pub offsets: Vec<usize>,
     pub sentence_ids: Vec<usize>,
@@ -228,7 +230,7 @@ impl Yake {
                 let words = split_into_words(&sentence);
                 let stems = words.iter().map(|w| w.to_lowercase()).collect();
                 let is_punctuation = words.iter().map(|w| self.word_is_punctuation(w)).collect();
-                Sentence { length: words.len(), words, stems, is_punctuation }
+                Sentence { length: words.len(), words, lc_words: stems, is_punctuation }
             })
             .collect()
     }
@@ -288,42 +290,38 @@ impl Yake {
     /// to calculate the importance of single terms.
     fn extract_features<'s>(&self, contexts: &Contexts, words: Words<'s>, sentences: &'s Sentences) -> Features {
         let tf = words.values().map(Vec::len);
-        let mut words_nsw: HashMap<String, usize> = HashMap::new();
-        for sentence in sentences {
-            for (word, &is_punctuation) in sentence.words.iter().zip(&sentence.is_punctuation) {
-                if is_punctuation || self.stop_words.contain(&word.to_lowercase()) {
-                    continue;
-                }
-                let key = &self.get_unique_term(&word);
-                if words_nsw.contains_key(key) {
-                    continue;
-                }
-                let occurrences: &Vec<Occurrence<'s>> = words.get(key).unwrap();
-                *words_nsw.entry(key.to_string()).or_default() = occurrences.len();
-            }
-        }
-        let tf_nsw = words_nsw.values().map(|x| *x as f64).collect::<Vec<_>>();
-        let std_tf = stddev(tf_nsw.iter().copied());
-        let mean_tf = mean(tf_nsw.iter().copied());
+
+        let words_nsw: HashMap<String, usize> = sentences
+            .iter()
+            .flat_map(|sentence| sentence.lc_words.iter().zip(&sentence.is_punctuation))
+            .filter(|&(lc_word, is_punct)| !is_punct && !self.stop_words.contain(lc_word))
+            .map(|(lc_word, _)| self.get_unique_term(lc_word))
+            .map(|key| {
+                let occurrences = words.get(&key).unwrap().len();
+                (key, occurrences)
+            })
+            .collect();
+
+        let tf_nsw = words_nsw.values().map(|x| *x as f64);
+        let std_tf = stddev(tf_nsw.clone());
+        let mean_tf = mean(tf_nsw);
         let max_tf = tf.max().unwrap() as f64;
 
         let mut features = Features::new();
 
-        let mut candidate_words: IndexSet<String> = IndexSet::new();
-        for sentence in sentences {
-            for (word, &is_punctuation) in sentence.words.iter().zip(&sentence.is_punctuation) {
-                if is_punctuation {
-                    continue;
-                }
-                candidate_words.insert(word.to_string());
-            }
-        }
-        for word in candidate_words {
-            let key: String = self.get_unique_term(&word);
+        let candidate_words: IndexSet<&LString> = sentences
+            .iter()
+            .flat_map(|sentence| sentence.lc_words.iter().zip(&sentence.is_punctuation))
+            .filter(|(_w, &is_punct)| !is_punct)
+            .map(|(lc_word, _)| lc_word)
+            .collect();
+
+        for lc_word in candidate_words {
+            let key: String = self.get_unique_term(lc_word);
             let occurrences = words.get(&key).unwrap();
 
             let mut cand = YakeCandidate {
-                is_stopword: self.stop_words.contain(&word.to_lowercase()),
+                is_stopword: self.stop_words.contain(lc_word),
                 tf: occurrences.len() as f64,
                 ..Default::default()
             };
@@ -410,7 +408,7 @@ impl Yake {
             cand.weight = (cand.relatedness * cand.position)
                 / (cand.casing + (cand.frequency / cand.relatedness) + (cand.sentences / cand.relatedness));
 
-            features.insert(word.to_lowercase(), cand);
+            features.insert(lc_word.clone(), cand);
         }
 
         features
@@ -427,40 +425,30 @@ impl Yake {
         let mut raw_lookup = HashMap::new();
 
         for (_k, v) in candidates {
-            let lowercase_forms = v.surface_forms.iter().map(|w| w.join(" ").to_lowercase() as LString);
-            for (idx, candidate) in lowercase_forms.enumerate() {
-                let tokens = v.surface_forms[idx].iter().clone().map(|w| w.to_lowercase());
+            let lc_surfaces = v.lc_surfaces.iter().map(|w| w.join(" ") as LString);
+            for (idx, candidate) in lc_surfaces.enumerate() {
+                let tokens = v.lc_surfaces[idx];
                 let mut prod_ = 1.0;
                 let mut sum_ = 0.0;
 
-                for (j, token) in tokens.clone().enumerate() {
-                    let Some(feat_cand) = features.get(&token) else { continue };
+                for (j, token) in tokens.iter().enumerate() {
+                    let Some(feat_cand) = features.get(token) else { continue };
                     if feat_cand.is_stopword {
-                        let unique_term_stop = self.get_unique_term(&token);
+                        let term_stop = self.get_unique_term(&token);
                         let mut prob_t1 = 0.0;
                         let mut prob_t2 = 0.0;
                         if 1 < j {
-                            let term_left = tokens.clone().nth(j - 1).unwrap();
-                            let _unique_term_left = self.get_unique_term(&term_left);
-                            prob_t1 = contexts
-                                .get(&_unique_term_left)
-                                .unwrap()
-                                .1
-                                .iter()
-                                .filter(|w| **w == unique_term_stop)
-                                .count() as f64
+                            let term_left = tokens.get(j - 1).unwrap();
+                            let term_left = self.get_unique_term(&term_left);
+                            prob_t1 = contexts.get(&term_left).unwrap().1.iter().filter(|w| **w == term_stop).count()
+                                as f64
                                 / features.get(&term_left).unwrap().tf;
                         }
                         if j + 1 < tokens.len() {
-                            let term_right = tokens.clone().nth(j + 1).unwrap();
-                            let _unique_term_right = self.get_unique_term(&term_right);
-                            prob_t2 = contexts
-                                .get(&unique_term_stop)
-                                .unwrap()
-                                .0
-                                .iter()
-                                .filter(|w| **w == _unique_term_right)
-                                .count() as f64
+                            let term_right = tokens.get(j + 1).unwrap();
+                            let term_right = self.get_unique_term(&term_right);
+                            prob_t2 = contexts.get(&term_stop).unwrap().0.iter().filter(|w| **w == term_right).count()
+                                as f64
                                 / features.get(&term_right).unwrap().tf;
                         }
 
@@ -476,12 +464,12 @@ impl Yake {
                     sum_ = 0.999999999;
                 }
 
-                let tf = v.surface_forms.len() as f64;
+                let tf = v.surfaces.len() as f64;
                 let weight = prod_ / (tf * (1.0 + sum_));
 
                 final_weights.insert(candidate.clone(), weight);
                 surface_to_lexical.insert(candidate.clone(), v.lexical_form.join(" "));
-                raw_lookup.insert(candidate.clone(), v.surface_forms[0].join(" ").clone());
+                raw_lookup.insert(candidate.clone(), v.surfaces[0].join(" ").clone());
             }
         }
 
@@ -499,16 +487,16 @@ impl Yake {
         // fixme: filter right before inserting into the set to optimize
         candidates.retain(|_k, v| !{
             // get the words from the first occurring surface form
-            let first_surf_form = v.surface_forms[0];
-            let words: HashSet<LString> = HashSet::from_iter(first_surf_form.iter().map(|w| w.to_lowercase()));
+            let first_lc_surface = v.lc_surfaces[0];
+            let lc_words: HashSet<&LString> = HashSet::from_iter(first_lc_surface);
 
-            let has_float = || words.iter().any(|w| w.parse::<f64>().is_ok());
-            let has_stop_word = || self.stop_words.intersect_with(&words);
-            let is_punctuation = || words.iter().any(|w| self.word_is_punctuation(w));
-            let not_enough_symbols = || words.iter().map(|w| w.len()).sum::<usize>() < minimum_length;
-            let has_too_short_word = || words.iter().map(|w| w.len()).min().unwrap_or(0) < minimum_word_size;
+            let has_float = || lc_words.iter().any(|w| w.parse::<f64>().is_ok());
+            let has_stop_word = || self.stop_words.intersect_with(&lc_words);
+            let is_punctuation = || lc_words.iter().any(|w| self.word_is_punctuation(w));
+            let not_enough_symbols = || lc_words.iter().map(|w| w.len()).sum::<usize>() < minimum_length;
+            let has_too_short_word = || lc_words.iter().map(|w| w.len()).min().unwrap_or(0) < minimum_word_size;
             let has_non_alphanumeric =
-                || only_alphanumeric_and_hyphen && !words.iter().all(word_is_alphanumeric_and_hyphen);
+                || only_alphanumeric_and_hyphen && !lc_words.iter().all(word_is_alphanumeric_and_hyphen);
 
             // remove candidate if
             has_float()
@@ -518,32 +506,31 @@ impl Yake {
                 || has_too_short_word()
                 || v.lexical_form.len() > maximum_word_number
                 || has_non_alphanumeric()
-                || first_surf_form[0].len() < 3 // fixme: magic constant
-                || first_surf_form.last().unwrap().len() < 3
+                || first_lc_surface[0].len() < 3 // fixme: magic constant
+                || first_lc_surface.last().unwrap().len() < 3
         });
     }
 
     fn ngram_selection<'s>(&self, n: usize, sentences: &'s Sentences) -> Candidates<'s> {
         let mut candidates: IndexMap<String, PreCandidate<'_>> = Candidates::new();
         for (idx, sentence) in sentences.iter().enumerate() {
-            let skip = min(n, sentence.length);
             let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
 
             for j in 0..sentence.length {
-                for k in j + 1..min(j + 1 + skip, sentence.length + 1) {
+                for k in j + 1..min(j + 1 + min(sentence.length, n), sentence.length + 1) {
                     let words = &sentence.words[j..k];
-                    let stems = &sentence.stems[j..k];
-                    let sentence_id = idx;
-                    let offset = j + shift;
-                    if stems.is_empty() {
+                    let lc_words = &sentence.lc_words[j..k];
+                    if words.is_empty() {
                         continue;
                     }
-                    let lexical_form = stems.join(" ");
+
+                    let lexical_form = lc_words.join(" ");
                     let candidate = candidates.entry(lexical_form).or_default();
-                    candidate.surface_forms.push(words);
-                    candidate.sentence_ids.push(sentence_id);
-                    candidate.offsets.push(offset);
-                    candidate.lexical_form = stems;
+                    candidate.surfaces.push(words);
+                    candidate.lc_surfaces.push(lc_words);
+                    candidate.sentence_ids.push(idx);
+                    candidate.offsets.push(j + shift);
+                    candidate.lexical_form = lc_words;
                 }
             }
         }

@@ -106,7 +106,12 @@ impl StopWords {
         word.len() < 3 || self.set.contains(word)
     }
 
-    pub fn intersect_with(&self, words: &HashSet<LString>) -> bool {
-        self.set.intersection(words).next().is_some() || words.iter().any(|w| w.len() < 3)
+    pub fn intersect_with(&self, words: &HashSet<&LString>) -> bool {
+        let intersects = if self.set.len() < words.len() {
+            self.set.iter().any(|w| words.contains(w))
+        } else {
+            words.iter().any(|&w| self.set.contains(w))
+        };
+        intersects || words.iter().any(|w| w.len() < 3)
     }
 }

@@ -203,7 +203,7 @@ impl Yake {
     }
 
     fn get_unique_term(&self, word: &str) -> UTerm {
-        let mut unique_term = word.to_lowercase().to_single();
+        let mut unique_term = word.to_single().to_lowercase();
         for punctuation_symbol in &self.config.punctuation {
             unique_term = unique_term.replace(*punctuation_symbol, "");
         }
@@ -555,15 +555,16 @@ trait PluralHelper {
     /// Omit the last `s` symbol in a string.
     ///
     /// How to use: `some_string.to_lowercase().to_single()`
-    fn to_single(self) -> String;
+    fn to_single(self) -> Self;
 }
 
-impl PluralHelper for String {
-    fn to_single(mut self) -> String {
-        if self.len() > 3 && self.ends_with('s') {
-            self.truncate(self.len() - 1)
+impl<'a> PluralHelper for &'a str {
+    fn to_single(self) -> &'a str {
+        if self.len() > 3 {
+            self.trim_end_matches(&['s', 'S'][..])
+        } else {
+            self
         }
-        self
     }
 }
 

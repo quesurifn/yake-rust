@@ -794,6 +794,45 @@ mod tests {
     }
 
     #[test]
+    fn composite_recurring_words_near_numbers() {
+        let text = "I buy 100 yellow bananas every day. Every night I eat bananas - all but 5 bananas.";
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(3));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "yellow bananas".into(), keyword: "yellow bananas".into(), score: 0.1017 },
+            ResultItem { raw: "day".into(), keyword: "day".into(), score: 0.1428 },
+            ResultItem { raw: "bananas".into(), keyword: "bananas".into(), score: 0.1489 },
+        ];
+
+        // LIAAD REFERENCE:
+        // - yellow bananas 0.0682
+        // - buy 0.1428
+        // - yellow 0.1428
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn composite_recurring_words_near_spelled_out_numbers() {
+        // For comparison with "composite_recurring_words_near_numbers" to see if numbers cause
+        let text = "I buy a hundred yellow bananas every day. Every night I eat bananas - all but five bananas.";
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(3));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "hundred yellow".into(), keyword: "hundred yellow".into(), score: 0.0446 },
+            ResultItem { raw: "yellow bananas".into(), keyword: "yellow bananas".into(), score: 0.1017 },
+            ResultItem { raw: "day".into(), keyword: "day".into(), score: 0.1428 },
+        ];
+        // Results agree with reference implementation LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn google_sample_single_ngram() {
         let text = include_str!("test_google.txt"); // LIAAD/yake sample text
         let stopwords = StopWords::predefined("en").unwrap();

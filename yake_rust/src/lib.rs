@@ -774,6 +774,26 @@ mod tests {
     }
 
     #[test]
+    fn composite_recurring_words_and_bigger_window() {
+        let text = "Machine learning is a growing field. Few research fields grow as much as machine learning grows.";
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual =
+            Yake::new(stopwords, Config { ngrams: 2, window_size: 2, ..Default::default() }).get_n_best(text, Some(5));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "Machine learning".into(), keyword: "machine learning".into(), score: 0.1346 },
+            ResultItem { raw: "growing field".into(), keyword: "growing field".into(), score: 0.1672 },
+            ResultItem { raw: "learning".into(), keyword: "learning".into(), score: 0.2265 },
+            ResultItem { raw: "Machine".into(), keyword: "machine".into(), score: 0.2341 },
+            ResultItem { raw: "growing".into(), keyword: "growing".into(), score: 0.2799 },
+        ];
+        // Results agree with reference implementation LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn google_sample_single_ngram() {
         let text = include_str!("test_google.txt"); // LIAAD/yake sample text
         let stopwords = StopWords::predefined("en").unwrap();

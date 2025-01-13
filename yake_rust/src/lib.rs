@@ -90,6 +90,7 @@ struct YakeCandidate {
     relatedness: f64,
     /// Term's different sentences heuristic
     sentences: f64,
+    /// Importance score. The less, the better
     weight: f64,
 }
 
@@ -103,6 +104,7 @@ pub struct ResultItem {
 #[derive(Debug, Clone)]
 struct Sentence {
     pub words: Vec<String>,
+    pub is_punctuation: Vec<bool>,
     pub stems: Vec<LString>,
     pub length: usize,
 }
@@ -191,7 +193,7 @@ impl Yake {
         }
     }
 
-    fn get_unique_term(&self, word: &str) -> String {
+    fn get_unique_term(&self, word: &str) -> LString {
         let mut unique_term = word.to_lowercase().to_single();
         for punctuation_symbol in &self.config.punctuation {
             unique_term = unique_term.replace(*punctuation_symbol, "");
@@ -225,7 +227,8 @@ impl Yake {
             .map(|sentence| {
                 let words = split_into_words(&sentence);
                 let stems = words.iter().map(|w| w.to_lowercase()).collect();
-                Sentence { length: words.len(), words, stems }
+                let is_punctuation = words.iter().map(|w| self.word_is_punctuation(w)).collect();
+                Sentence { length: words.len(), words, stems, is_punctuation }
             })
             .collect()
     }
@@ -236,9 +239,9 @@ impl Yake {
         for (idx, sentence) in sentences.iter().enumerate() {
             let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
 
-            for (w_idx, word) in sentence.words.iter().enumerate() {
-                if !word.is_empty() && !HashSet::from_iter(word.chars()).is_subset(&self.config.punctuation) {
-                    let index = self.get_unique_term(&word);
+            for (w_idx, (word, is_punctuation)) in sentence.words.iter().zip(&sentence.is_punctuation).enumerate() {
+                if !word.is_empty() && !is_punctuation {
+                    let index = self.get_unique_term(word);
                     let occurrence = Occurrence { shift_offset: shift + w_idx, idx, word, shift };
                     words.entry(index).or_default().push(occurrence)
                 }
@@ -257,8 +260,8 @@ impl Yake {
         for sentence in sentences {
             let mut buffer: Vec<LString> = Vec::new();
 
-            for snt_word in &sentence.words {
-                if HashSet::from_iter(snt_word.chars()).is_subset(&self.config.punctuation) {
+            for (snt_word, &is_punctuation) in sentence.words.iter().zip(&sentence.is_punctuation) {
+                if is_punctuation {
                     buffer.clear();
                     continue;
                 }
@@ -287,10 +290,8 @@ impl Yake {
         let tf = words.values().map(Vec::len);
         let mut words_nsw: HashMap<String, usize> = HashMap::new();
         for sentence in sentences {
-            for word in &sentence.words {
-                if HashSet::from_iter(word.chars()).is_subset(&self.config.punctuation)
-                    || self.stop_words.contain(&word.to_lowercase())
-                {
+            for (word, &is_punctuation) in sentence.words.iter().zip(&sentence.is_punctuation) {
+                if is_punctuation || self.stop_words.contain(&word.to_lowercase()) {
                     continue;
                 }
                 let key = &self.get_unique_term(&word);
@@ -310,8 +311,8 @@ impl Yake {
 
         let mut candidate_words: IndexSet<String> = IndexSet::new();
         for sentence in sentences {
-            for word in &sentence.words {
-                if HashSet::from_iter(word.chars()).is_subset(&self.config.punctuation) {
+            for (word, &is_punctuation) in sentence.words.iter().zip(&sentence.is_punctuation) {
+                if is_punctuation {
                     continue;
                 }
                 candidate_words.insert(word.to_string());
@@ -495,8 +496,6 @@ impl Yake {
         maximum_word_number: usize,
         only_alphanumeric_and_hyphen: bool, // could be a function
     ) {
-        let word_is_punctuation = |word: &String| HashSet::from_iter(word.chars()).is_subset(&self.config.punctuation);
-
         // fixme: filter right before inserting into the set to optimize
         candidates.retain(|_k, v| !{
             // get the words from the first occurring surface form
@@ -505,7 +504,7 @@ impl Yake {
 
             let has_float = || words.iter().any(|w| w.parse::<f64>().is_ok());
             let has_stop_word = || self.stop_words.intersect_with(&words);
-            let is_punctuation = || words.iter().any(word_is_punctuation);
+            let is_punctuation = || words.iter().any(|w| self.word_is_punctuation(w));
             let not_enough_symbols = || words.iter().map(|w| w.len()).sum::<usize>() < minimum_length;
             let has_too_short_word = || words.iter().map(|w| w.len()).min().unwrap_or(0) < minimum_word_size;
             let has_non_alphanumeric =
@@ -549,6 +548,10 @@ impl Yake {
             }
         }
         candidates
+    }
+
+    fn word_is_punctuation(&self, word: impl AsRef<str>) -> bool {
+        HashSet::from_iter(word.as_ref().chars()).is_subset(&self.config.punctuation)
     }
 }
 

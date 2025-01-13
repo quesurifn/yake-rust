@@ -113,8 +113,6 @@ struct Sentence {
 struct PreCandidate<'s> {
     pub surfaces: Vec<&'s [String]>,
     pub lc_surfaces: Vec<&'s [LString]>,
-    /// Is the latest from lc_words. todo: replace with lc_surfaces.last()
-    pub lexical_form: &'s [LString],
     pub offsets: Vec<usize>,
     pub sentence_ids: Vec<usize>,
 }
@@ -426,7 +424,7 @@ impl Yake {
         let mut raw_lookup = HashMap::new();
 
         for (_k, v) in candidates {
-            for candidate in v.lc_surfaces {
+            for &candidate in &v.lc_surfaces {
                 let tokens = candidate;
                 let mut prod_ = 1.0;
                 let mut sum_ = 0.0;
@@ -468,7 +466,7 @@ impl Yake {
                 let weight = prod_ / (tf * (1.0 + sum_));
 
                 final_weights.insert(candidate, weight);
-                surface_to_lexical.insert(candidate, v.lexical_form);
+                surface_to_lexical.insert(candidate, *v.lc_surfaces.last().unwrap());
                 raw_lookup.insert(candidate, v.surfaces[0]);
             }
         }
@@ -488,6 +486,7 @@ impl Yake {
         candidates.retain(|_k, v| !{
             // get the words from the first occurring surface form
             let first_lc_surface = v.lc_surfaces[0];
+            let last_lc_surface = v.lc_surfaces.last().unwrap();
             let lc_words: HashSet<&LString> = HashSet::from_iter(first_lc_surface);
 
             let has_float = || lc_words.iter().any(|w| w.parse::<f64>().is_ok());
@@ -504,7 +503,7 @@ impl Yake {
                 || is_punctuation()
                 || not_enough_symbols()
                 || has_too_short_word()
-                || v.lexical_form.len() > maximum_word_number
+                || last_lc_surface.len() > maximum_word_number
                 || has_non_alphanumeric()
                 || first_lc_surface[0].len() < 3 // fixme: magic constant
                 || first_lc_surface.last().unwrap().len() < 3
@@ -529,7 +528,6 @@ impl Yake {
                     candidate.lc_surfaces.push(lc_words);
                     candidate.sentence_ids.push(idx);
                     candidate.offsets.push(j + shift);
-                    candidate.lexical_form = lc_words;
                 }
             }
         }

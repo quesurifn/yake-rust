@@ -17,21 +17,27 @@ mod levenshtein;
 mod preprocessor;
 mod stopwords;
 
+/// String from the original text
+type RawString = String;
+
 /// Lowercased string
 type LString = String;
+
+/// Lowercased string without punctuation symbols in single form
+type UTerm = String;
 
 type Sentences = Vec<Sentence>;
 /// Key is `stems.join(" ")`
 type Candidates<'s> = IndexMap<&'s [LString], PreCandidate<'s>>;
 type Features<'s> = HashMap<&'s LString, YakeCandidate>;
-type Words<'s> = HashMap<LString, Vec<Occurrence<'s>>>;
-type Contexts = HashMap<LString, (Vec<LString>, Vec<LString>)>;
+type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
+type Contexts<'s> = HashMap<&'s UTerm, (Vec<&'s UTerm>, Vec<&'s RawString>)>;
 
 struct WeightedCandidates<'s> {
     final_weights: IndexMap<&'s [LString], f64>,
-    surface_to_lexical: HashMap<&'s [LString], &'s [LString]>,
-    contexts: Contexts,
-    raw_lookup: HashMap<&'s [LString], &'s [String]>,
+    _surface_to_lexical: HashMap<&'s [LString], &'s [LString]>,
+    _contexts: Contexts<'s>,
+    raw_lookup: HashMap<&'s [LString], &'s [RawString]>,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug)]
@@ -103,9 +109,10 @@ pub struct ResultItem {
 
 #[derive(Debug, Clone)]
 struct Sentence {
-    pub words: Vec<String>,
+    pub words: Vec<RawString>,
     pub is_punctuation: Vec<bool>,
     pub lc_words: Vec<LString>,
+    pub uq_terms: Vec<UTerm>,
     pub length: usize,
 }
 
@@ -113,6 +120,7 @@ struct Sentence {
 struct PreCandidate<'s> {
     pub surfaces: Vec<&'s [String]>,
     pub lc_surfaces: Vec<&'s [LString]>,
+    pub uq_terms: Vec<&'s [UTerm]>,
     pub offsets: Vec<usize>,
     pub sentence_ids: Vec<usize>,
 }
@@ -194,7 +202,7 @@ impl Yake {
         }
     }
 
-    fn get_unique_term(&self, word: &str) -> LString {
+    fn get_unique_term(&self, word: &str) -> UTerm {
         let mut unique_term = word.to_lowercase().to_single();
         for punctuation_symbol in &self.config.punctuation {
             unique_term = unique_term.replace(*punctuation_symbol, "");
@@ -227,9 +235,10 @@ impl Yake {
             .into_iter()
             .map(|sentence| {
                 let words = split_into_words(&sentence);
-                let stems = words.iter().map(|w| w.to_lowercase()).collect();
+                let lc_words = words.iter().map(|w| w.to_lowercase()).collect::<Vec<LString>>();
+                let uq_terms = lc_words.iter().map(|w| self.get_unique_term(w)).collect();
                 let is_punctuation = words.iter().map(|w| self.word_is_punctuation(w)).collect();
-                Sentence { length: words.len(), words, lc_words: stems, is_punctuation }
+                Sentence { length: words.len(), words, lc_words, uq_terms, is_punctuation }
             })
             .collect()
     }
@@ -240,9 +249,10 @@ impl Yake {
         for (idx, sentence) in sentences.iter().enumerate() {
             let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
 
-            for (w_idx, (word, is_punctuation)) in sentence.words.iter().zip(&sentence.is_punctuation).enumerate() {
+            for (w_idx, ((word, is_punctuation), index)) in
+                sentence.words.iter().zip(&sentence.is_punctuation).zip(&sentence.uq_terms).enumerate()
+            {
                 if !word.is_empty() && !is_punctuation {
-                    let index = self.get_unique_term(word);
                     let occurrence = Occurrence { shift_offset: shift + w_idx, idx, word, shift };
                     words.entry(index).or_default().push(occurrence)
                 }
@@ -255,28 +265,29 @@ impl Yake {
     /// Builds co-occurrence matrix containing the co-occurrences between
     /// a given term and its predecessor AND a given term and its subsequent term,
     /// found within a window of a given size.
-    fn build_context(&self, sentences: &Sentences) -> Contexts {
+    fn build_context<'s>(&self, sentences: &'s [Sentence]) -> Contexts<'s> {
         let mut contexts = Contexts::new();
 
         for sentence in sentences {
-            let mut buffer: Vec<LString> = Vec::new();
+            let mut buffer: Vec<&UTerm> = Vec::new();
 
-            for (snt_word, &is_punctuation) in sentence.words.iter().zip(&sentence.is_punctuation) {
+            for ((snt_word, snt_key), &is_punctuation) in
+                sentence.words.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation)
+            {
                 if is_punctuation {
                     buffer.clear();
                     continue;
                 }
-                let snt_key = self.get_unique_term(&snt_word);
 
                 let min_range = buffer.len().saturating_sub(self.config.window_size);
                 let max_range = buffer.len();
 
-                for buf_word in &buffer[min_range..max_range] {
-                    let entry_1 = contexts.entry(snt_key.clone()).or_default();
-                    entry_1.0.push(buf_word.clone());
+                for &buf_word in &buffer[min_range..max_range] {
+                    let entry_1 = contexts.entry(snt_key).or_default();
+                    entry_1.0.push(buf_word);
 
-                    let entry_2 = contexts.entry(buf_word.clone()).or_default();
-                    entry_2.1.push(snt_word.clone());
+                    let entry_2 = contexts.entry(buf_word).or_default();
+                    entry_2.1.push(snt_word);
                 }
                 buffer.push(snt_key);
             }
@@ -290,14 +301,13 @@ impl Yake {
     fn extract_features<'s>(&self, contexts: &Contexts, words: Words<'s>, sentences: &'s Sentences) -> Features<'s> {
         let tf = words.values().map(Vec::len);
 
-        let words_nsw: HashMap<String, usize> = sentences
+        let words_nsw: HashMap<&UTerm, usize> = sentences
             .iter()
-            .flat_map(|sentence| sentence.lc_words.iter().zip(&sentence.is_punctuation))
-            .filter(|&(lc_word, is_punct)| !is_punct && !self.stop_words.contain(lc_word))
-            .map(|(lc_word, _)| self.get_unique_term(lc_word))
-            .map(|key| {
-                let occurrences = words.get(&key).unwrap().len();
-                (key, occurrences)
+            .flat_map(|sentence| sentence.lc_words.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation))
+            .filter(|&((lc_word, _), is_punct)| !is_punct && !self.stop_words.contain(lc_word))
+            .map(|((_, u_term), _)| {
+                let occurrences = words.get(u_term).unwrap().len();
+                (u_term, occurrences)
             })
             .collect();
 
@@ -308,16 +318,15 @@ impl Yake {
 
         let mut features = Features::new();
 
-        let candidate_words: IndexSet<&LString> = sentences
+        let candidate_words: IndexSet<_> = sentences
             .iter()
-            .flat_map(|sentence| sentence.lc_words.iter().zip(&sentence.is_punctuation))
-            .filter(|(_w, &is_punct)| !is_punct)
-            .map(|(lc_word, _)| lc_word)
+            .flat_map(|sentence| sentence.lc_words.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation))
+            .filter(|&(_, is_punct)| !is_punct)
+            .map(|(pair, _)| pair)
             .collect();
 
-        for lc_word in candidate_words {
-            let key: String = self.get_unique_term(lc_word);
-            let occurrences = words.get(&key).unwrap();
+        for (lc_word, u_term) in candidate_words {
+            let occurrences = words.get(u_term).unwrap();
 
             let mut cand = YakeCandidate {
                 is_stopword: self.stop_words.contain(lc_word),
@@ -386,11 +395,11 @@ impl Yake {
             }
 
             {
-                if let Some((leftward, rightward)) = contexts.get(&key) {
-                    let distinct: HashSet<&str> = HashSet::from_iter(leftward.iter().map(Deref::deref));
+                if let Some((leftward, rightward)) = contexts.get(&u_term) {
+                    let distinct: HashSet<&UTerm> = HashSet::from_iter(leftward.iter().map(Deref::deref));
                     cand.dl = if leftward.is_empty() { 0. } else { distinct.len() as f64 / leftward.len() as f64 };
 
-                    let distinct: HashSet<&str> = HashSet::from_iter(rightward.iter().map(Deref::deref));
+                    let distinct: HashSet<&RawString> = HashSet::from_iter(rightward.iter().map(Deref::deref));
                     cand.dr = if rightward.is_empty() { 0. } else { distinct.len() as f64 / rightward.len() as f64 };
                 }
 
@@ -415,36 +424,33 @@ impl Yake {
 
     fn candidate_weighting<'s>(
         &self,
-        features: Features,
-        contexts: Contexts,
+        features: Features<'s>,
+        contexts: Contexts<'s>,
         candidates: Candidates<'s>,
     ) -> WeightedCandidates<'s> {
         let mut final_weights: IndexMap<&'s [String], f64> = IndexMap::new();
-        let mut surface_to_lexical = HashMap::new();
+        let mut _surface_to_lexical = HashMap::new();
         let mut raw_lookup = HashMap::new();
 
         for (_k, v) in candidates {
-            for &candidate in &v.lc_surfaces {
+            for (&candidate, &u_terms) in v.lc_surfaces.iter().zip(&v.uq_terms) {
                 let tokens = candidate;
                 let mut prod_ = 1.0;
                 let mut sum_ = 0.0;
 
-                for (j, token) in tokens.iter().enumerate() {
+                for (j, (token, term_stop)) in tokens.iter().zip(u_terms).enumerate() {
                     let Some(feat_cand) = features.get(token) else { continue };
                     if feat_cand.is_stopword {
-                        let term_stop = self.get_unique_term(&token);
                         let mut prob_t1 = 0.0;
                         let mut prob_t2 = 0.0;
                         if 1 < j {
-                            let term_left = tokens.get(j - 1).unwrap();
-                            let term_left = self.get_unique_term(&term_left);
+                            let term_left = u_terms.get(j - 1).unwrap();
                             prob_t1 = contexts.get(&term_left).unwrap().1.iter().filter(|w| **w == term_stop).count()
                                 as f64
                                 / features.get(&term_left).unwrap().tf;
                         }
                         if j + 1 < tokens.len() {
-                            let term_right = tokens.get(j + 1).unwrap();
-                            let term_right = self.get_unique_term(&term_right);
+                            let term_right = u_terms.get(j + 1).unwrap();
                             prob_t2 = contexts.get(&term_stop).unwrap().0.iter().filter(|w| **w == term_right).count()
                                 as f64
                                 / features.get(&term_right).unwrap().tf;
@@ -466,12 +472,12 @@ impl Yake {
                 let weight = prod_ / (tf * (1.0 + sum_));
 
                 final_weights.insert(candidate, weight);
-                surface_to_lexical.insert(candidate, *v.lc_surfaces.last().unwrap());
+                _surface_to_lexical.insert(candidate, *v.lc_surfaces.last().unwrap());
                 raw_lookup.insert(candidate, v.surfaces[0]);
             }
         }
 
-        WeightedCandidates { final_weights, surface_to_lexical, contexts, raw_lookup }
+        WeightedCandidates { final_weights, _surface_to_lexical, _contexts: contexts, raw_lookup }
     }
 
     fn filter_candidates(
@@ -517,15 +523,17 @@ impl Yake {
 
             for j in 0..sentence.length {
                 for k in j + 1..min(j + 1 + min(sentence.length, n), sentence.length + 1) {
-                    let words = &sentence.words[j..k];
-                    let lc_words = &sentence.lc_words[j..k];
-                    if words.is_empty() {
+                    if (j..k).is_empty() {
                         continue;
                     }
+
+                    let words = &sentence.words[j..k];
+                    let lc_words = &sentence.lc_words[j..k];
 
                     let candidate = candidates.entry(lc_words).or_default();
                     candidate.surfaces.push(words);
                     candidate.lc_surfaces.push(lc_words);
+                    candidate.uq_terms.push(&sentence.uq_terms);
                     candidate.sentence_ids.push(idx);
                     candidate.offsets.push(j + shift);
                 }

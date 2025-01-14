@@ -222,7 +222,7 @@ impl Yake {
         for punctuation_symbol in &self.config.punctuation {
             mod_word = mod_word.replace(*punctuation_symbol, "");
         }
-        mod_word.len() < 3
+        mod_word.chars().count() < 3
     }
 
     fn remove_duplicates(&self, results: Vec<ResultItem>, n: usize) -> Vec<ResultItem> {
@@ -550,8 +550,9 @@ impl Yake {
             let has_float = || lc_words.iter().any(|w| w.parse::<f64>().is_ok());
             let has_stop_word = || self.stop_words.intersect_with(&lc_words);
             let is_punctuation = || lc_words.iter().any(|w| self.word_is_punctuation(w));
-            let not_enough_symbols = || lc_words.iter().map(|w| w.len()).sum::<usize>() < minimum_length;
-            let has_too_short_word = || lc_words.iter().map(|w| w.len()).min().unwrap_or(0) < minimum_word_size;
+            let not_enough_symbols = || lc_words.iter().map(|w| w.chars().count()).sum::<usize>() < minimum_length;
+            let has_too_short_word =
+                || lc_words.iter().map(|w| w.chars().count()).min().unwrap_or(0) < minimum_word_size;
             let has_non_alphanumeric =
                 || only_alphanumeric_and_hyphen && !lc_words.iter().all(word_is_alphanumeric_and_hyphen);
 
@@ -616,7 +617,7 @@ trait PluralHelper {
 
 impl<'a> PluralHelper for &'a str {
     fn to_single(self) -> &'a str {
-        if self.len() > 3 {
+        if self.chars().count() > 3 {
             self.trim_end_matches(&['s', 'S'][..])
         } else {
             self
@@ -948,9 +949,9 @@ mod tests {
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected: Results = vec![
-            ResultItem { raw: "Genius".into(), keyword: "genius".into(), score: 0.0263 }, // LIAAD REFERENCE: 0.0261
-            ResultItem { raw: "company".into(), keyword: "company".into(), score: 0.0267 }, // LIAAD REFERENCE: 0.0263
-            ResultItem { raw: "Genius quietly laid".into(), keyword: "genius quietly laid".into(), score: 0.0283 }, // LIAAD REFERENCE: 0.027
+            ResultItem { raw: "Genius".into(), keyword: "genius".into(), score: 0.026 }, // LIAAD REFERENCE: 0.0261
+            ResultItem { raw: "company".into(), keyword: "company".into(), score: 0.0263 }, // LIAAD REFERENCE: 0.0263
+            ResultItem { raw: "Genius quietly laid".into(), keyword: "genius quietly laid".into(), score: 0.0269 }, // LIAAD REFERENCE: 0.027
         ];
 
         // REASONS FOR DISCREPANCY:

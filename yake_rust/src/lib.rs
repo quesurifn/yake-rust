@@ -372,7 +372,6 @@ impl Yake {
         let std_tf = stddev(tf_nsw.clone());
         let mean_tf = mean(tf_nsw);
         let max_tf = tf.max().unwrap() as f64;
-        println!("std_tf: {}, mean_tf: {}, max_tf: {}", std_tf, mean_tf, max_tf);
 
         let mut features = Features::new();
 
@@ -451,11 +450,9 @@ impl Yake {
                 if let Some((leftward, rightward)) = contexts.get(&u_term) {
                     let distinct: HashSet<&UTerm> = HashSet::from_iter(leftward.iter().map(Deref::deref));
                     cand.dl = if leftward.is_empty() { 0. } else { distinct.len() as f64 / leftward.len() as f64 };
-                    println!("leftward: {:?}", leftward);
 
                     let distinct: HashSet<&RawString> = HashSet::from_iter(rightward.iter().map(Deref::deref));
                     cand.dr = if rightward.is_empty() { 0. } else { distinct.len() as f64 / rightward.len() as f64 };
-                    println!("rightward: {:?}", rightward);
                 }
 
                 cand.relatedness = 1.0 + (cand.dr + cand.dl) * (cand.tf / max_tf);
@@ -471,7 +468,6 @@ impl Yake {
             cand.weight = (cand.relatedness * cand.position)
                 / (cand.casing + (cand.frequency / cand.relatedness) + (cand.sentences / cand.relatedness));
 
-            println!("[{}] tf: {}, tf_n: {}, tf_a: {}, frequency: {}, casing: {}, position: {}, sentences: {}, relatedness: {}, dl: {}, dr: {}", lc_word, cand.tf, cand.tf_n, cand.tf_a, cand.frequency, cand.casing, cand.position, cand.sentences, cand.relatedness, cand.dl, cand.dr);
             features.insert(lc_word, cand);
         }
 
@@ -956,6 +952,12 @@ mod tests {
             ResultItem { raw: "company".into(), keyword: "company".into(), score: 0.0267 }, // LIAAD REFERENCE: 0.0263
             ResultItem { raw: "Genius quietly laid".into(), keyword: "genius quietly laid".into(), score: 0.0283 }, // LIAAD REFERENCE: 0.027
         ];
+
+        // REASONS FOR DISCREPANCY:
+        // - The TF statistics are different (std_tf, mean_tf, max_tf) because we have some extra terms
+        //   which consist only of special characters, e.g., "’", which appears as "â€™" when printed.
+        //   Python evaluates the length of "’" to 1 but most likely we get the length of "â€™" as 3
+        //   and therefore do not count it as a stopword. This is probably related to character encoding.
 
         assert_eq!(actual, expected);
     }

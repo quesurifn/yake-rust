@@ -40,6 +40,15 @@ struct WeightedCandidates<'s> {
     raw_lookup: HashMap<&'s [LString], &'s [RawString]>,
 }
 
+#[derive(Eq, PartialEq)]
+enum Tag {
+    D,
+    U,
+    A,
+    N,
+    P,
+}
+
 #[derive(PartialEq, Eq, Hash, Debug)]
 struct Occurrence<'sentence> {
     /// Ordinal number of the word in the source text after splitting into sentences
@@ -53,10 +62,6 @@ struct Occurrence<'sentence> {
 }
 
 impl<'s> Occurrence<'s> {
-    fn is_acronym(&self) -> bool {
-        self.word.len() > 1 && self.word.chars().all(char::is_uppercase)
-    }
-
     /// The first symbol is uppercase.
     fn is_uppercased(&self) -> bool {
         self.word.chars().next().is_some_and(char::is_uppercase)
@@ -81,7 +86,7 @@ struct YakeCandidate {
     /// The number of times this candidate term is marked as an acronym (=all uppercase).
     tf_a: f64,
     /// The number of occurrences of this candidate term starting with an uppercase letter.
-    tf_u: f64,
+    tf_n: f64,
     /// Term casing heuristic.
     casing: f64,
     /// Term position heuristic
@@ -203,11 +208,21 @@ impl Yake {
     }
 
     fn get_unique_term(&self, word: &str) -> UTerm {
-        let mut unique_term = word.to_single().to_lowercase();
-        for punctuation_symbol in &self.config.punctuation {
-            unique_term = unique_term.replace(*punctuation_symbol, "");
+        word.to_single().to_lowercase()
+    }
+
+    fn is_stopword(&self, lc_word: &LString) -> bool {
+        if self.stop_words.contain(&lc_word) {
+            return true;
         }
-        unique_term
+        if self.stop_words.contain(&lc_word.to_single()) {
+            return true;
+        }
+        let mut mod_word = lc_word.clone();
+        for punctuation_symbol in &self.config.punctuation {
+            mod_word = mod_word.replace(*punctuation_symbol, "");
+        }
+        mod_word.len() < 3
     }
 
     fn remove_duplicates(&self, results: Vec<ResultItem>, n: usize) -> Vec<ResultItem> {
@@ -282,18 +297,60 @@ impl Yake {
                 let min_range = buffer.len().saturating_sub(self.config.window_size);
                 let max_range = buffer.len();
 
-                for &buf_word in &buffer[min_range..max_range] {
-                    let entry_1 = contexts.entry(snt_key).or_default();
-                    entry_1.0.push(buf_word);
+                if !self.is_d_tagged(&snt_word) && !self.is_u_tagged(&snt_word) {
+                    for &buf_word in &buffer[min_range..max_range] {
+                        if self.is_d_tagged(&buf_word) || self.is_u_tagged(&buf_word) {
+                            continue;
+                        }
+                        let entry_1 = contexts.entry(snt_key).or_default();
+                        entry_1.0.push(buf_word);
 
-                    let entry_2 = contexts.entry(buf_word).or_default();
-                    entry_2.1.push(snt_word);
+                        let entry_2 = contexts.entry(buf_word).or_default();
+                        entry_2.1.push(snt_key);
+                    }
                 }
                 buffer.push(snt_key);
             }
         }
 
         contexts
+    }
+
+    fn is_d_tagged(&self, word: &str) -> bool {
+        word.replace(",", "").parse::<f64>().is_ok()
+    }
+
+    fn is_u_tagged(&self, word: &str) -> bool {
+        self.word_has_multiple_punctuation_symbols(word) || {
+            let nr_of_digits = word.chars().filter(|w| w.is_ascii_digit()).count();
+            let nr_of_alphas = word.chars().filter(|w| w.is_alphabetic()).count();
+            (nr_of_alphas > 0 && nr_of_digits > 0) || (nr_of_alphas == 0 && nr_of_digits == 0)
+        }
+    }
+    fn is_a_tagged(&self, word: &str) -> bool {
+        word.chars().all(char::is_uppercase)
+    }
+
+    fn is_n_tagged(&self, occurence: &Occurrence) -> bool {
+        let is_capital =
+            if self.config.strict_capital { Occurrence::is_capitalized } else { Occurrence::is_uppercased };
+        is_capital(occurence) && !occurence.is_first_word()
+    }
+
+    fn get_tag(&self, occurence: &Occurrence) -> Tag {
+        if self.is_d_tagged(occurence.word) {
+            return Tag::D;
+        }
+        if self.is_u_tagged(occurence.word) {
+            return Tag::U;
+        }
+        if self.is_a_tagged(occurence.word) {
+            return Tag::A;
+        }
+        if self.is_n_tagged(occurence) {
+            return Tag::N;
+        }
+        return Tag::P;
     }
 
     /// Computes local statistic features that extract informative content within the text
@@ -315,6 +372,7 @@ impl Yake {
         let std_tf = stddev(tf_nsw.clone());
         let mean_tf = mean(tf_nsw);
         let max_tf = tf.max().unwrap() as f64;
+        println!("std_tf: {}, mean_tf: {}, max_tf: {}", std_tf, mean_tf, max_tf);
 
         let mut features = Features::new();
 
@@ -329,25 +387,20 @@ impl Yake {
             let occurrences = words.get(u_term).unwrap();
 
             let mut cand = YakeCandidate {
-                is_stopword: self.stop_words.contain(lc_word),
+                is_stopword: self.is_stopword(lc_word),
                 tf: occurrences.len() as f64,
                 ..Default::default()
             };
 
             {
-                // We consider the occurrence of acronyms through a heuristic, where all the letters of the word are capitals.
-                cand.tf_a = occurrences.iter().filter(|&occ| occ.is_acronym()).count() as f64;
-
-                // We give extra attention to any term beginning with a capital letter (excluding the beginning of sentences).
-                let is_capital =
-                    if self.config.strict_capital { Occurrence::is_capitalized } else { Occurrence::is_uppercased };
-
-                cand.tf_u = occurrences.iter().filter(|&occ| is_capital(occ) && !occ.is_first_word()).count() as f64;
+                let tags: Vec<Tag> = occurrences.iter().map(|occ| self.get_tag(occ)).collect();
+                cand.tf_a = tags.iter().filter(|&tag| *tag == Tag::A).count() as f64;
+                cand.tf_n = tags.iter().filter(|&tag| *tag == Tag::N).count() as f64;
 
                 // The casing aspect of a term is an important feature when considering the extraction
                 // of keywords. The underlying rationale is that uppercase terms tend to be more
                 // relevant than lowercase ones.
-                cand.casing = cand.tf_a.max(cand.tf_u);
+                cand.casing = cand.tf_a.max(cand.tf_n);
 
                 // The more often the candidate term occurs with a capital letter, the more important
                 // it is considered. This means that a candidate term that occurs with a capital letter
@@ -398,9 +451,11 @@ impl Yake {
                 if let Some((leftward, rightward)) = contexts.get(&u_term) {
                     let distinct: HashSet<&UTerm> = HashSet::from_iter(leftward.iter().map(Deref::deref));
                     cand.dl = if leftward.is_empty() { 0. } else { distinct.len() as f64 / leftward.len() as f64 };
+                    println!("leftward: {:?}", leftward);
 
                     let distinct: HashSet<&RawString> = HashSet::from_iter(rightward.iter().map(Deref::deref));
                     cand.dr = if rightward.is_empty() { 0. } else { distinct.len() as f64 / rightward.len() as f64 };
+                    println!("rightward: {:?}", rightward);
                 }
 
                 cand.relatedness = 1.0 + (cand.dr + cand.dl) * (cand.tf / max_tf);
@@ -416,6 +471,7 @@ impl Yake {
             cand.weight = (cand.relatedness * cand.position)
                 / (cand.casing + (cand.frequency / cand.relatedness) + (cand.sentences / cand.relatedness));
 
+            println!("[{}] tf: {}, tf_n: {}, tf_a: {}, frequency: {}, casing: {}, position: {}, sentences: {}, relatedness: {}, dl: {}, dr: {}", lc_word, cand.tf, cand.tf_n, cand.tf_a, cand.frequency, cand.casing, cand.position, cand.sentences, cand.relatedness, cand.dl, cand.dr);
             features.insert(lc_word, cand);
         }
 
@@ -540,6 +596,10 @@ impl Yake {
             }
         }
         candidates
+    }
+
+    fn word_has_multiple_punctuation_symbols(&self, word: impl AsRef<str>) -> bool {
+        HashSet::from_iter(word.as_ref().chars()).intersection(&self.config.punctuation).count() > 1
     }
 
     fn word_is_punctuation(&self, word: impl AsRef<str>) -> bool {
@@ -801,15 +861,11 @@ mod tests {
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected: Results = vec![
-            ResultItem { raw: "yellow bananas".into(), keyword: "yellow bananas".into(), score: 0.1017 },
-            ResultItem { raw: "day".into(), keyword: "day".into(), score: 0.1428 },
-            ResultItem { raw: "bananas".into(), keyword: "bananas".into(), score: 0.1489 },
+            ResultItem { raw: "yellow bananas".into(), keyword: "yellow bananas".into(), score: 0.0682 },
+            ResultItem { raw: "buy".into(), keyword: "buy".into(), score: 0.1428 },
+            ResultItem { raw: "yellow".into(), keyword: "yellow".into(), score: 0.1428 },
         ];
-
-        // LIAAD REFERENCE:
-        // - yellow bananas 0.0682
-        // - buy 0.1428
-        // - yellow 0.1428
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }
@@ -847,14 +903,11 @@ mod tests {
             ResultItem { raw: "platform".into(), keyword: "platform".into(), score: 0.124 },
             ResultItem { raw: "service".into(), keyword: "service".into(), score: 0.1316 },
             ResultItem { raw: "acquiring".into(), keyword: "acquiring".into(), score: 0.1511 },
+            ResultItem { raw: "learning".into(), keyword: "learning".into(), score: 0.1621 },
             ResultItem { raw: "Goldbloom".into(), keyword: "goldbloom".into(), score: 0.1625 },
-            ResultItem { raw: "machine".into(), keyword: "machine".into(), score: 0.1722 }, // LIAAD REFERENCE: 0.1672
-            ResultItem { raw: "learning".into(), keyword: "learning".into(), score: 0.1722 }, // LIAAD REFERENCE: 0.1621 (so should be ranked higher)
+            ResultItem { raw: "machine".into(), keyword: "machine".into(), score: 0.1672 },
         ];
-
-        // REASONS FOR DISCREPANCY:
-        // - "machine" and "learning" have different relatedness - in our code, they get one value; in LIAAD/yake, they
-        //   both have different values, none of which matches ours.
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }
@@ -887,6 +940,22 @@ mod tests {
             ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0983 },
         ];
         // Results agree with reference implementation LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn genius_sample_defaults() {
+        let text = include_str!("test_genius.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(3));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "Genius".into(), keyword: "genius".into(), score: 0.0263 }, // LIAAD REFERENCE: 0.0261
+            ResultItem { raw: "company".into(), keyword: "company".into(), score: 0.0267 }, // LIAAD REFERENCE: 0.0263
+            ResultItem { raw: "Genius quietly laid".into(), keyword: "genius quietly laid".into(), score: 0.0283 }, // LIAAD REFERENCE: 0.027
+        ];
 
         assert_eq!(actual, expected);
     }

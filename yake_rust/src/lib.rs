@@ -2,7 +2,7 @@
 #![allow(clippy::type_complexity)]
 
 use std::cmp::min;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 use std::ops::Deref;
 
@@ -284,20 +284,18 @@ impl Yake {
         let mut contexts = Contexts::new();
 
         for sentence in sentences {
-            let mut track: Vec<&UTerm> = Vec::new();
+            let mut window: VecDeque<&UTerm> = VecDeque::with_capacity(self.config.window_size + 1);
 
             for ((word, term), &is_punctuation) in
                 sentence.words.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation)
             {
                 if is_punctuation {
-                    track.clear();
+                    window.clear();
                     continue;
                 }
 
-                let previous_n_terms = track.len().saturating_sub(self.config.window_size);
-
                 if !self.is_d_tagged(word) && !self.is_u_tagged(word) {
-                    for &left in &track[previous_n_terms..] {
+                    for &left in window.iter() {
                         if self.is_d_tagged(left) || self.is_u_tagged(left) {
                             continue;
                         }
@@ -307,7 +305,10 @@ impl Yake {
                     }
                 }
 
-                track.push(term);
+                if window.len() == self.config.window_size {
+                    window.pop_front();
+                }
+                window.push_back(term);
             }
         }
 

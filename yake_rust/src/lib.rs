@@ -31,7 +31,7 @@ type Sentences = Vec<Sentence>;
 type Candidates<'s> = IndexMap<&'s [LString], PreCandidate<'s>>;
 type Features<'s> = HashMap<&'s LString, YakeCandidate>;
 type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
-type Contexts<'s> = HashMap<&'s UTerm, (Vec<&'s UTerm>, Vec<&'s RawString>)>;
+type Contexts<'s> = HashMap<&'s UTerm, (Vec<&'s UTerm>, Vec<&'s UTerm>)>;
 
 struct WeightedCandidates<'s> {
     final_weights: IndexMap<&'s [LString], f64>,
@@ -284,32 +284,30 @@ impl Yake {
         let mut contexts = Contexts::new();
 
         for sentence in sentences {
-            let mut buffer: Vec<&UTerm> = Vec::new();
+            let mut track: Vec<&UTerm> = Vec::new();
 
-            for ((snt_word, snt_key), &is_punctuation) in
+            for ((word, term), &is_punctuation) in
                 sentence.words.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation)
             {
                 if is_punctuation {
-                    buffer.clear();
+                    track.clear();
                     continue;
                 }
 
-                let min_range = buffer.len().saturating_sub(self.config.window_size);
-                let max_range = buffer.len();
+                let previous_n_terms = track.len().saturating_sub(self.config.window_size);
 
-                if !self.is_d_tagged(&snt_word) && !self.is_u_tagged(&snt_word) {
-                    for &buf_word in &buffer[min_range..max_range] {
-                        if self.is_d_tagged(&buf_word) || self.is_u_tagged(&buf_word) {
+                if !self.is_d_tagged(word) && !self.is_u_tagged(word) {
+                    for &left in &track[previous_n_terms..] {
+                        if self.is_d_tagged(left) || self.is_u_tagged(left) {
                             continue;
                         }
-                        let entry_1 = contexts.entry(snt_key).or_default();
-                        entry_1.0.push(buf_word);
 
-                        let entry_2 = contexts.entry(buf_word).or_default();
-                        entry_2.1.push(snt_key);
+                        contexts.entry(term).or_default().0.push(left); // term: [.., ->left]
+                        contexts.entry(left).or_default().1.push(term); // left: [.., ->term]
                     }
                 }
-                buffer.push(snt_key);
+
+                track.push(term);
             }
         }
 
@@ -448,10 +446,10 @@ impl Yake {
 
             {
                 if let Some((leftward, rightward)) = contexts.get(&u_term) {
-                    let distinct: HashSet<&UTerm> = HashSet::from_iter(leftward.iter().map(Deref::deref));
+                    let distinct: HashSet<_> = HashSet::from_iter(leftward.iter().map(Deref::deref));
                     cand.dl = if leftward.is_empty() { 0. } else { distinct.len() as f64 / leftward.len() as f64 };
 
-                    let distinct: HashSet<&RawString> = HashSet::from_iter(rightward.iter().map(Deref::deref));
+                    let distinct: HashSet<_> = HashSet::from_iter(rightward.iter().map(Deref::deref));
                     cand.dr = if rightward.is_empty() { 0. } else { distinct.len() as f64 / rightward.len() as f64 };
                 }
 

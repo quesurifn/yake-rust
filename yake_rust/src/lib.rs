@@ -218,7 +218,7 @@ impl Yake {
 
     fn is_stopword(&self, lc_word: &LString) -> bool {
         // todo: optimize by iterating the smallest set or with a trie
-        if self.stop_words.contain(lc_word) || self.stop_words.contain(lc_word.to_single()) {
+        if self.stop_words.contains(lc_word) || self.stop_words.contains(lc_word.to_single()) {
             return true;
         }
         let mut mod_word = lc_word.clone();
@@ -362,7 +362,7 @@ impl Yake {
         let words_nsw: HashMap<&UTerm, usize> = sentences
             .iter()
             .flat_map(|sentence| sentence.lc_words.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation))
-            .filter(|&((lc_word, _), is_punct)| !is_punct && !self.stop_words.contain(lc_word))
+            .filter(|&((lc_word, _), is_punct)| !is_punct && !self.is_stopword(lc_word))
             .map(|((_, u_term), _)| {
                 let occurrences = words.get(u_term).unwrap().len();
                 (u_term, occurrences)
@@ -956,16 +956,11 @@ mod tests {
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected: Results = vec![
-            ResultItem { raw: "Genius".into(), keyword: "genius".into(), score: 0.026 }, // LIAAD REFERENCE: 0.0261
-            ResultItem { raw: "company".into(), keyword: "company".into(), score: 0.0263 }, // LIAAD REFERENCE: 0.0263
-            ResultItem { raw: "Genius quietly laid".into(), keyword: "genius quietly laid".into(), score: 0.0269 }, // LIAAD REFERENCE: 0.027
+            ResultItem { raw: "Genius".into(), keyword: "genius".into(), score: 0.0261 },
+            ResultItem { raw: "company".into(), keyword: "company".into(), score: 0.0263 },
+            ResultItem { raw: "Genius quietly laid".into(), keyword: "genius quietly laid".into(), score: 0.027 },
         ];
-
-        // REASONS FOR DISCREPANCY:
-        // - The TF statistics are different (std_tf, mean_tf, max_tf) because we have some extra terms
-        //   which consist only of special characters, e.g., "’", which appears as "â€™" when printed.
-        //   Python evaluates the length of "’" to 1 but most likely we get the length of "â€™" as 3
-        //   and therefore do not count it as a stopword. This is probably related to character encoding.
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }

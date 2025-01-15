@@ -101,11 +101,14 @@ impl StopWords {
 }
 
 impl StopWords {
-    pub fn contain(&self, word: &str) -> bool {
-        word.chars().count() < 3 || self.set.contains(word)
+    pub fn contains(&self, word: &str) -> bool {
+        self.set.contains(word)
     }
 
     pub fn intersect_with(&self, words: &HashSet<&LString>) -> bool {
+        // todo: Stopword checks should be done with Yake.is_stopword
+        //   so this function should go away. Ideally StopWords could
+        //   just be a HashSet.
         let intersects = if self.set.len() < words.len() {
             self.set.iter().any(|w| words.contains(w))
         } else {

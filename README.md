@@ -1,7 +1,9 @@
 # YAKE (Yet Another Keyword Extractor) [![](https://img.shields.io/crates/v/yake-rust.svg)](https://crates.io/crates/yake-rust) [![](https://docs.rs/yake-rust/badge.svg)](https://docs.rs/yake-rust/)
 
 Yake is a language agnostic statistical keyword extractor weighing several factors such as acronyms, position in
-paragraph, capitalization, how many sentences the keyword appears in, stopwords, punctuation and more. Details are in these papers: [brief](https://doi.org/10.1016/j.ins.2019.09.013), [extended](https://repositorio.inesctec.pt/server/api/core/bitstreams/ef121a01-a0a6-4be8-945d-3324a58fc944/content).
+paragraph, capitalization, how many sentences the keyword appears in, stopwords, punctuation and more. Details are in
+these papers: [brief](https://repositorio.inesctec.pt/server/api/core/bitstreams/ef121a01-a0a6-4be8-945d-3324a58fc944/content), 
+[extended](https://doi.org/10.1016/j.ins.2019.09.013).
 
 This crate is ported and is close as possible to the [reference implementation](https://github.com/LIAAD/yake/).
 
@@ -38,7 +40,7 @@ fn main() {
 
     let now = std::time::Instant::now();
 
-    let keywords = 
+    let keywords =
         Yake::new(StopWords::predefined("en").unwrap(), Config::default())
             .get_n_best(text, Some(10));
 

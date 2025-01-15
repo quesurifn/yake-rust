@@ -631,7 +631,10 @@ impl<'a> PluralHelper for &'a str {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use super::*;
+
     type Results = Vec<ResultItem>;
 
     #[test]

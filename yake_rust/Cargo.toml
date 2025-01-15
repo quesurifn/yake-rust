@@ -61,6 +61,7 @@ indexmap = "2.7.0"
 
 [dev-dependencies]
 rusty-hook = { workspace = true }
+pretty_assertions = "1.4.1"
 
 [lib]
 path = "src/lib.rs"

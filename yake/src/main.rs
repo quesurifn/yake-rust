@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
-use yake_rust::{Config, StopWords, Yake};
+use yake_rust::{Config, ResultItem, StopWords, Yake};
 
 #[derive(Clone, Copy, ValueEnum)]
 enum DedupFunction {
@@ -53,6 +53,9 @@ struct Cli {
     // -l, --language TEXT             Language
     #[arg(short, long, default_value= "en", value_parser = StopWords::predefined)]
     language: StopWords,
+
+    #[arg(long, action)]
+    json: bool,
 }
 
 fn dedup_parser(cli_dedup_lim: &str) -> Result<f64, String> {
@@ -101,7 +104,21 @@ fn main() {
     let now = std::time::Instant::now();
 
     let keywords = Yake::new(StopWords::predefined("en").unwrap(), config).get_n_best(text, Some(10));
+    output_keywords(&keywords, cli.json);
+    eprintln!("Elapsed: {:.2?}", now.elapsed());
+}
 
-    println!("{:?}", keywords);
-    println!("Elapsed: {:.2?}", now.elapsed());
+fn output_keywords(keywords: &Vec<ResultItem>, json: bool) {
+    if json {
+        match serde_json::to_string(&keywords) {
+            Ok(str) => {
+                println!("{}", str)
+            }
+            Err(e) => {
+                eprintln!("Unexpected error happened while trying to serialize result to json : {:?}", e)
+            }
+        }
+    } else {
+        println!("{:?}", keywords);
+    }
 }

@@ -70,6 +70,9 @@ struct Cli {
     /// Language
     #[arg(short, long, default_value= "en", value_parser = parse_language, help = "Language", value_name = "TEXT")]
     language: StopWords,
+
+    #[arg(long, help = "Dump output as JSON")]
+    json: bool,
 }
 
 fn parse_language(cli_language: &str) -> Result<StopWords, String> {
@@ -89,6 +92,7 @@ pub struct ParsedCli {
     pub config: Config,
     pub language: StopWords,
     pub input: String,
+    pub json: bool,
     pub top: Option<usize>,
     pub verbose: bool,
 }
@@ -115,7 +119,6 @@ pub fn parse_cli() -> ParsedCli {
     };
 
     ParsedCli {
-        input,
         config: Config {
             ngrams: cli.ngram_size,
             window_size: cli.window_size,
@@ -123,6 +126,8 @@ pub fn parse_cli() -> ParsedCli {
             ..Config::default()
         },
         language: cli.language,
+        input,
+        json: cli.json,
         verbose: cli.verbose,
         top: cli.top,
     }

@@ -949,6 +949,38 @@ mod tests {
     }
 
     #[test]
+    fn gitter_sample_defaults() {
+        let text = include_str!("test_gitter.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "Gitter".into(), keyword: "gitter".into(), score: 0.0189 }, // LIAAD REFERENCE: 0.0190
+            ResultItem {
+                raw: "acquires software chat".into(),
+                keyword: "acquires software chat".into(),
+                score: 0.0473,
+            }, // LIAAD REFERENCE: 0.0479
+            ResultItem { raw: "GitLab".into(), keyword: "gitlab".into(), score: 0.0477 }, // LIAAD REFERENCE: 0.0478
+            ResultItem { raw: "chat startup Gitter".into(), keyword: "chat startup gitter".into(), score: 0.0507 }, // LIAAD REFERENCE: 0.0512
+            ResultItem { raw: "software chat startup".into(), keyword: "software chat startup".into(), score: 0.0605 }, // LIAAD REFERENCE: 0.0612
+            ResultItem {
+                raw: "GitLab acquires software".into(),
+                keyword: "gitlab acquires software".into(),
+                score: 0.0677,
+            }, // LIAAD REFERENCE: 0.0685
+            ResultItem { raw: "Gitter chat".into(), keyword: "gitter chat".into(), score: 0.0681 }, // LIAAD REFERENCE: 0.0684
+            ResultItem { raw: "startup".into(), keyword: "startup".into(), score: 0.078 }, // LIAAD REFERENCE: 0.0783
+            ResultItem { raw: "software".into(), keyword: "software".into(), score: 0.0876 }, // LIAAD REFERENCE: 0.0879
+            ResultItem { raw: "code".into(), keyword: "code".into(), score: 0.0876 },      // LIAAD REFERENCE: 0.0879
+        ];
+        // NOTE: Due to different scores, ResultItem order is different in LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn genius_sample_defaults() {
         let text = include_str!("test_genius.txt"); // LIAAD/yake sample text
         let stopwords = StopWords::predefined("en").unwrap();

@@ -1,0 +1,8 @@
+[package]
+name = "yake"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+yake-rust = { path = "../yake_rust" }
+clap = { version = "4.5.26", features = ["cargo", "derive", "string"] }

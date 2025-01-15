@@ -19,7 +19,7 @@ impl StopWords {
     }
 
     /// Load a predefined list of stopwords for the language given as argument.
-    pub fn predefined(lang: &str) -> Option<Self> {
+    pub fn predefined(lang: &str) -> Result<Self, String> {
         // https://github.com/LIAAD/yake/tree/0fa58cceb465162b6bd0cab7ec967edeb907fbcc/yake/StopwordsList
         // files were taken from the original repository, with extra modifications:
         // - add extra line at the end
@@ -94,10 +94,10 @@ impl StopWords {
             "uk" => include_str!("uk.txt"),
             #[cfg(feature = "zh")]
             "zh" => include_str!("zh.txt"),
-            _ => return None,
+            _ => return Err(format!("Could not find language {}, did you enable this feature?", lang)),
         };
 
-        Some(Self { set: file.lines().map(ToOwned::to_owned).collect() })
+        Ok(Self { set: file.lines().map(ToOwned::to_owned).collect() })
     }
 }
 

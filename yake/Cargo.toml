@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 yake-rust = { path = "../yake_rust" }
 clap = { version = "4.5.26", features = ["cargo", "derive", "string"] }
+serde_json = "1.0.135"

@@ -58,6 +58,7 @@ contractions = "0.5.4"
 segtok = "0.1.2"
 levenshtein = "1.0.5"
 indexmap = "2.7.0"
+serde = "1.0.217"
 
 [dev-dependencies]
 divan = "0.1.17"

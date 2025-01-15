@@ -7,6 +7,7 @@ use std::iter::FromIterator;
 use indexmap::{IndexMap, IndexSet};
 use plural_helper::PluralHelper;
 use preprocessor::{split_into_sentences, split_into_words};
+use serde::Serialize;
 use stats::{mean, median, stddev};
 
 use crate::context::Contexts;
@@ -100,7 +101,7 @@ struct TermStats {
     score: f64,
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Serialize)]
 pub struct ResultItem {
     pub raw: String,
     pub keyword: LTerm,

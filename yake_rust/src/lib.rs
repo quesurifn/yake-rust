@@ -952,13 +952,20 @@ mod tests {
     fn genius_sample_defaults() {
         let text = include_str!("test_genius.txt"); // LIAAD/yake sample text
         let stopwords = StopWords::predefined("en").unwrap();
-        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(3));
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected: Results = vec![
             ResultItem { raw: "Genius".into(), keyword: "genius".into(), score: 0.0261 },
             ResultItem { raw: "company".into(), keyword: "company".into(), score: 0.0263 },
             ResultItem { raw: "Genius quietly laid".into(), keyword: "genius quietly laid".into(), score: 0.027 },
+            ResultItem { raw: "company quietly laid".into(), keyword: "company quietly laid".into(), score: 0.0392 },
+            ResultItem { raw: "media company".into(), keyword: "media company".into(), score: 0.0404 },
+            ResultItem { raw: "Lehman".into(), keyword: "lehman".into(), score: 0.0412 },
+            ResultItem { raw: "quietly laid".into(), keyword: "quietly laid".into(), score: 0.0583 },
+            ResultItem { raw: "Tom Lehman told".into(), keyword: "tom lehman told".into(), score: 0.0603 },
+            ResultItem { raw: "video".into(), keyword: "video".into(), score: 0.0650 },
+            ResultItem { raw: "co-founder Tom Lehman".into(), keyword: "co-founder tom lehman".into(), score: 0.0669 },
         ];
         // Results agree with reference implementation LIAAD/yake
 

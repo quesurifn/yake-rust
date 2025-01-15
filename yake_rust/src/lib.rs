@@ -40,13 +40,13 @@ struct WeightedCandidates<'s> {
     raw_lookup: HashMap<&'s [LString], &'s [RawString]>,
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum Tag {
-    D,
-    U,
-    A,
-    N,
-    P,
+    Digit,
+    Unparsable,
+    Acronym,
+    Uppercase,
+    Parsable,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug)]
@@ -62,6 +62,11 @@ struct Occurrence<'sentence> {
 }
 
 impl<'s> Occurrence<'s> {
+    /// USA, USSR, but not B2C.
+    fn _is_acronym(&self) -> bool {
+        self.word.len() > 1 && self.word.chars().all(char::is_uppercase)
+    }
+
     /// The first symbol is uppercase.
     fn is_uppercased(&self) -> bool {
         self.word.chars().next().is_some_and(char::is_uppercase)
@@ -212,10 +217,8 @@ impl Yake {
     }
 
     fn is_stopword(&self, lc_word: &LString) -> bool {
-        if self.stop_words.contain(&lc_word) {
-            return true;
-        }
-        if self.stop_words.contain(&lc_word.to_single()) {
+        // todo: optimize by iterating the smallest set or with a trie
+        if self.stop_words.contain(lc_word) || self.stop_words.contain(lc_word.to_single()) {
             return true;
         }
         let mut mod_word = lc_word.clone();
@@ -326,30 +329,29 @@ impl Yake {
             (nr_of_alphas > 0 && nr_of_digits > 0) || (nr_of_alphas == 0 && nr_of_digits == 0)
         }
     }
+
     fn is_a_tagged(&self, word: &str) -> bool {
         word.chars().all(char::is_uppercase)
     }
 
-    fn is_n_tagged(&self, occurence: &Occurrence) -> bool {
+    fn is_n_tagged(&self, occurrence: &Occurrence) -> bool {
         let is_capital =
             if self.config.strict_capital { Occurrence::is_capitalized } else { Occurrence::is_uppercased };
-        is_capital(occurence) && !occurence.is_first_word()
+        is_capital(occurrence) && !occurrence.is_first_word()
     }
 
-    fn get_tag(&self, occurence: &Occurrence) -> Tag {
-        if self.is_d_tagged(occurence.word) {
-            return Tag::D;
+    fn get_tag(&self, occurrence: &Occurrence) -> Tag {
+        if self.is_d_tagged(occurrence.word) {
+            Tag::Digit
+        } else if self.is_u_tagged(occurrence.word) {
+            Tag::Unparsable
+        } else if self.is_a_tagged(occurrence.word) {
+            Tag::Acronym
+        } else if self.is_n_tagged(occurrence) {
+            Tag::Uppercase
+        } else {
+            Tag::Parsable
         }
-        if self.is_u_tagged(occurence.word) {
-            return Tag::U;
-        }
-        if self.is_a_tagged(occurence.word) {
-            return Tag::A;
-        }
-        if self.is_n_tagged(occurence) {
-            return Tag::N;
-        }
-        return Tag::P;
     }
 
     /// Computes local statistic features that extract informative content within the text
@@ -391,9 +393,12 @@ impl Yake {
             };
 
             {
+                // todo: revert back to the code from 5a6e4747, as tags change nothing
                 let tags: Vec<Tag> = occurrences.iter().map(|occ| self.get_tag(occ)).collect();
-                cand.tf_a = tags.iter().filter(|&tag| *tag == Tag::A).count() as f64;
-                cand.tf_n = tags.iter().filter(|&tag| *tag == Tag::N).count() as f64;
+                // We consider the occurrence of acronyms through a heuristic, where all the letters of the word are capitals.
+                cand.tf_a = tags.iter().filter(|&tag| *tag == Tag::Acronym).count() as f64;
+                // We give extra attention to any term beginning with a capital letter (excluding the beginning of sentences).
+                cand.tf_n = tags.iter().filter(|&tag| *tag == Tag::Uppercase).count() as f64;
 
                 // The casing aspect of a term is an important feature when considering the extraction
                 // of keywords. The underlying rationale is that uppercase terms tend to be more
@@ -426,7 +431,7 @@ impl Yake {
                 // Our assumption is that terms that occur in the early
                 // sentences of a text should be more highly valued than terms that appear later. Thus,
                 // instead of considering a uniform distribution of terms, our model assigns higher
-                // scores to terms found in early sentences. todo: set affects median
+                // scores to terms found in early sentences. todo: optimize space, dedup sorted indexes
                 let sentence_ids: HashSet<_> = occurrences.iter().map(|o| o.idx).collect();
                 // When the candidate term only appears in the first sentence, the median function
                 // can return a value of 0. To guarantee position > 0, a constant 3 > e=2.71 is added.

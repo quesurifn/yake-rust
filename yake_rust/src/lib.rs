@@ -621,8 +621,10 @@ trait PluralHelper {
 
 impl<'a> PluralHelper for &'a str {
     fn to_single(self) -> &'a str {
-        if self.chars().count() > 3 {
-            self.trim_end_matches(&['s', 'S'][..])
+        if self.chars().count() > 3 && (self.ends_with("s") || self.ends_with("S")) {
+            let mut chars = self.chars();
+            chars.next_back();
+            chars.as_str()
         } else {
             self
         }

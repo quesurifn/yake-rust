@@ -979,6 +979,15 @@ mod tests {
         ];
         // NOTE: Due to different scores, ResultItem order is different in LIAAD/yake
 
+        // REASONS FOR DISCREPANCY
+        // - Python segtok and rust segtok splits "won’t" and "weren’t" differently.
+        //   Python splits before the "n" while rust splits after it.
+        //   This results in Rust having the extra non-stopword tokens {'won', 'weren'}
+        //   - both with TF 1. ("’t" has length < 3 and is considered a stopword)
+        //   whereas Python has the extra non-stopword token {'n’t'} (TF 2)
+        //   Two terms with TF=1 vs one term with TF=2 results in different std_tf and mean_tf,
+        //   and thus different cand.frequency.
+
         assert_eq!(actual, expected);
     }
 

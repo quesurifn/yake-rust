@@ -8,6 +8,7 @@ use std::ops::Deref;
 
 use indexmap::{IndexMap, IndexSet};
 use preprocessor::{split_into_sentences, split_into_words};
+#[cfg(feature = "serde")]
 use serde::Serialize;
 use stats::{mean, median, stddev};
 
@@ -101,7 +102,8 @@ struct YakeCandidate {
     weight: f64,
 }
 
-#[derive(PartialEq, Clone, Debug, Serialize)]
+#[derive(PartialEq, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ResultItem {
     pub raw: String,
     pub keyword: LString,

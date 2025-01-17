@@ -103,7 +103,7 @@ struct TermStats {
 }
 
 #[derive(PartialEq, Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ResultItem {
     pub raw: String,
     pub keyword: LTerm,

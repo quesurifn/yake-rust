@@ -1,8 +1,8 @@
-use clap::error::ErrorKind;
-use clap::{CommandFactory, Parser};
 use std::{path::PathBuf, sync::LazyLock};
 
+use clap::error::ErrorKind;
 use clap::{command, Args};
+use clap::{CommandFactory, Parser};
 use yake_rust::{Config, StopWords};
 
 static DEFAULT_CONFIG: LazyLock<Config> = LazyLock::new(Config::default);

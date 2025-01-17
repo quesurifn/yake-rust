@@ -221,7 +221,7 @@ impl Yake {
         self.stop_words.contains(lc_word)
             || self.stop_words.contains(lc_word.to_single())
             // having less than 3 non-punctuation symbols is typical for stop words
-            || lc_word.chars().filter(|ch| !self.config.punctuation.contains(ch)).count() < 3
+            || lc_word.to_single().chars().filter(|ch| !self.config.punctuation.contains(ch)).count() < 3
     }
 
     pub fn contains_stopword(&self, words: &HashSet<&LString>) -> bool {

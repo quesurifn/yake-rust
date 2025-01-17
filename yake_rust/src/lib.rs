@@ -1046,6 +1046,21 @@ mod tests {
             }, // LIAAD REFERENCE: 0.0379
         ];
 
+        // REASONS FOR DISCREPANCY:
+        // - The text contains both "bereit" ("ready") and "bereits" ("already").
+        //   While "bereits" is a stopword, "bereit" is not.
+        //   LIAAD/yake keeps track of whether a term is a stopword or not
+        //   in a key-value mapping, where the key is the term, lowercase, plural-normalized.
+        //   (Note that the plural normalization techique used is rarely effective in German.)
+        //   Since "bereits" occurs before "bereit" in the text, LIAAD/yake sees it,
+        //   recognizes it is a stopword, and stores it under the key "bereit". Later,
+        //   when it encounters "bereit" (NOT a stopword), it already has that key in its
+        //   mapping so it looks it up and finds that it is a keyword (which it is not).
+        //   Meanwhile, yake-rust does not have such a key-value store, so it correctly
+        //   recognizes "bereits" as a stopword and "bereit" as a non-stopword. The extra
+        //   inclusion of "bereit" in the non-stopwords affects the TF statistics and thus
+        //   the frequency contribution to the weights, leading to slightly different scores.
+
         assert_eq!(actual, expected);
     }
 }

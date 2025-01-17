@@ -1005,4 +1005,47 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn german_sample_defaults() {
+        let text = include_str!("test_german.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("de").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            ResultItem { raw: "Vereinigten Staaten".into(), keyword: "vereinigten staaten".into(), score: 0.0152 }, // LIAAD REFERENCE: 0.151
+            ResultItem {
+                raw: "Präsidenten Donald Trump".into(),
+                keyword: "präsidenten donald trump".into(),
+                score: 0.0182,
+            },
+            ResultItem { raw: "Donald Trump".into(), keyword: "donald trump".into(), score: 0.0211 }, // LIAAD REFERENCE: 0.21
+            ResultItem { raw: "trifft Donald Trump".into(), keyword: "trifft donald trump".into(), score: 0.0231 }, // LIAAD REFERENCE: 0.23
+            ResultItem { raw: "Trump".into(), keyword: "trump".into(), score: 0.0240 },
+            ResultItem {
+                raw: "Trumps Finanzminister Steven".into(),
+                keyword: "trumps finanzminister steven".into(),
+                score: 0.0243,
+            },
+            ResultItem {
+                raw: "Kanzlerin Angela Merkel".into(),
+                keyword: "kanzlerin angela merkel".into(),
+                score: 0.0275,
+            }, // LIAAD REFERENCE: 0.273
+            ResultItem {
+                raw: "deutsche Kanzlerin Angela".into(),
+                keyword: "deutsche kanzlerin angela".into(),
+                score: 0.0316,
+            }, // LIAAD REFERENCE: 0.314
+            ResultItem { raw: "Merkel trifft Donald".into(), keyword: "merkel trifft donald".into(), score: 0.0353 }, // LIAAD REFERENCE: 0.351
+            ResultItem {
+                raw: "Exportnation Deutschland".into(),
+                keyword: "exportnation deutschland".into(),
+                score: 0.038,
+            }, // LIAAD REFERENCE: 0.0379
+        ];
+
+        assert_eq!(actual, expected);
+    }
 }

@@ -6,6 +6,7 @@ these papers: [brief](https://repositorio.inesctec.pt/server/api/core/bitstreams
 [extended](https://doi.org/10.1016/j.ins.2019.09.013).
 
 This crate is ported and is close as possible to the [reference implementation](https://github.com/LIAAD/yake/).
+The input text is split onto sentences and tokens via [segtok](https://github.com/xamgore/segtok) crate.
 
 ## How it works
 
@@ -32,9 +33,9 @@ Eventually, the most important terms:
 - prefer being Capitalized or UPPERCASED
 - prefer having the same neighbours
 
-✨Keyphrases✨ are ranged: frequent & important at the top, loosers on the bottom.
+✨Keyphrases✨ are ranged: frequent & important at the top, noisy losers on the bottom.
 
-Duplicates are detected by [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance) and removed.
+Duplicates are then detected by [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance) and removed.
 
 ## Example
 

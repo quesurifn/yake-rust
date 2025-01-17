@@ -9,7 +9,7 @@ use std::ops::Deref;
 use indexmap::{IndexMap, IndexSet};
 use preprocessor::{split_into_sentences, split_into_words};
 #[cfg(feature = "serde")]
-use serde::Serialize;
+use serde;
 use stats::{mean, median, stddev};
 
 use crate::levenshtein::levenshtein_ratio;
@@ -103,7 +103,7 @@ struct YakeCandidate {
 }
 
 #[derive(PartialEq, Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ResultItem {
     pub raw: String,
     pub keyword: LString,
@@ -129,6 +129,7 @@ struct PreCandidate<'s> {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Config {
     /// The number of n-grams.
     ///
@@ -163,6 +164,7 @@ impl Default for Config {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Yake {
     config: Config,
     stop_words: StopWords,

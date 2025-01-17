@@ -8,7 +8,7 @@ use indexmap::{IndexMap, IndexSet};
 use plural_helper::PluralHelper;
 use preprocessor::{split_into_sentences, split_into_words};
 #[cfg(feature = "serde")]
-use serde::Serialize;
+use serde;
 use stats::{mean, median, stddev};
 
 use crate::context::Contexts;
@@ -103,7 +103,7 @@ struct TermStats {
 }
 
 #[derive(PartialEq, Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ResultItem {
     pub raw: String,
     pub keyword: LTerm,
@@ -134,6 +134,7 @@ struct Candidate<'s> {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Config {
     /// The number of n-grams.
     ///
@@ -175,6 +176,7 @@ impl Default for Config {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Yake {
     config: Config,
     stop_words: StopWords,

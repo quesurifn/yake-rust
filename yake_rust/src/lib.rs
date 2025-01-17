@@ -1063,4 +1063,35 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn dutch_sample_defaults() {
+        let text = include_str!("test_nl.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("nl").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![
+            // LIAAD REFERENCE: Missing: ResultItem { raw: "Vincent van Gogh".into(), keyword: "vincent van gogh".into(), score: 0.0111 },
+            ResultItem { raw: "Gogh Museum".into(), keyword: "gogh museum".into(), score: 0.0125 },
+            ResultItem { raw: "Gogh".into(), keyword: "gogh".into(), score: 0.0150 },
+            ResultItem { raw: "Museum".into(), keyword: "museum".into(), score: 0.0438 },
+            ResultItem { raw: "brieven".into(), keyword: "brieven".into(), score: 0.0635 },
+            ResultItem { raw: "Vincent".into(), keyword: "vincent".into(), score: 0.0643 },
+            ResultItem { raw: "Goghs schilderijen".into(), keyword: "goghs schilderijen".into(), score: 0.1009 },
+            ResultItem { raw: "Gogh verging".into(), keyword: "gogh verging".into(), score: 0.1215 },
+            ResultItem { raw: "Goghs".into(), keyword: "goghs".into(), score: 0.1651 },
+            ResultItem { raw: "schrijven".into(), keyword: "schrijven".into(), score: 0.1704 },
+            ResultItem { raw: "Amsterdam".into(), keyword: "amsterdam".into(), score: 0.1813 }, // Same as LIAAD/yake, but #11
+        ];
+
+        // REASONS FOR DISCREPANCY:
+        // - For both implementations, "van" is a stopword. Most likely, filter_candidates
+        //   removes "Vincent van Gogh" because it contains a stopword. The corresponding logic
+        //   of filtering in LIAAD/yake is "none of the consituent words may be tagged 'u' or 'd'
+        //   and the first and last terms must not be stopwords". There are no digits or punctuation
+        //   symbols, so there are no 'u' or 'd' tags, and neither "Vincent" nor "Gogh" are stopwords.
+
+        assert_eq!(actual, expected);
+    }
 }

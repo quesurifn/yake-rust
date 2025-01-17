@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::ops::{Deref, DerefMut};
 
 use crate::LString;
 
@@ -13,7 +14,7 @@ pub struct StopWords {
 
 impl StopWords {
     /// Use the passed set of lowercased strings as stopwords.
-    pub fn custom(lowercased: HashSet<String>) -> Self {
+    pub fn custom(lowercased: HashSet<LString>) -> Self {
         StopWords { set: lowercased }
     }
 
@@ -104,16 +105,28 @@ impl StopWords {
     pub fn contains(&self, word: &str) -> bool {
         self.set.contains(word)
     }
+}
 
-    pub fn intersect_with(&self, words: &HashSet<&LString>) -> bool {
-        // todo: Stopword checks should be done with Yake.is_stopword
-        //   so this function should go away. Ideally StopWords could
-        //   just be a HashSet.
-        let intersects = if self.set.len() < words.len() {
-            self.set.iter().any(|w| words.contains(w))
-        } else {
-            words.iter().any(|&w| self.set.contains(w))
-        };
-        intersects || words.iter().any(|w| w.chars().count() < 3)
+impl Deref for StopWords {
+    type Target = HashSet<LString>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.set
+    }
+}
+
+impl<T> AsRef<T> for StopWords
+where
+    T: ?Sized,
+    <StopWords as Deref>::Target: AsRef<T>,
+{
+    fn as_ref(&self) -> &T {
+        self.deref().as_ref()
+    }
+}
+
+impl DerefMut for StopWords {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.set
     }
 }

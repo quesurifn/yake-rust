@@ -218,14 +218,14 @@ impl Yake {
 
     fn is_stopword(&self, lc_word: &LString) -> bool {
         // todo: optimize by iterating the smallest set or with a trie
-        if self.stop_words.contains(lc_word) || self.stop_words.contains(lc_word.to_single()) {
-            return true;
-        }
-        let mut mod_word = lc_word.clone();
-        for punctuation_symbol in &self.config.punctuation {
-            mod_word = mod_word.replace(*punctuation_symbol, "");
-        }
-        mod_word.chars().count() < 3
+        self.stop_words.contains(lc_word)
+            || self.stop_words.contains(lc_word.to_single())
+            // having less than 3 non-punctuation symbols is typical for stop words
+            || lc_word.chars().filter(|ch| !self.config.punctuation.contains(ch)).count() < 3
+    }
+
+    pub fn contains_stopword(&self, words: &HashSet<&LString>) -> bool {
+        words.iter().any(|w| self.is_stopword(w))
     }
 
     fn remove_duplicates(&self, results: Vec<ResultItem>, n: usize) -> Vec<ResultItem> {
@@ -552,7 +552,7 @@ impl Yake {
             let lc_words: HashSet<&LString> = HashSet::from_iter(first_lc_surface);
 
             let has_float = || lc_words.iter().any(|w| w.parse::<f64>().is_ok());
-            let has_stop_word = || self.stop_words.intersect_with(&lc_words);
+            let has_stop_word = || self.contains_stopword(&lc_words);
             let is_punctuation = || lc_words.iter().any(|w| self.word_is_punctuation(w));
             let not_enough_symbols = || lc_words.iter().map(|w| w.chars().count()).sum::<usize>() < minimum_length;
             let has_too_short_word =
@@ -621,7 +621,7 @@ trait PluralHelper {
 
 impl<'a> PluralHelper for &'a str {
     fn to_single(self) -> &'a str {
-        if self.chars().count() > 3 && (self.ends_with("s") || self.ends_with("S")) {
+        if self.chars().count() > 3 && (self.ends_with(['s', 'S'])) {
             let mut chars = self.chars();
             chars.next_back();
             chars.as_str()

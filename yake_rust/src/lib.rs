@@ -584,13 +584,12 @@ impl Yake {
                         continue;
                     }
 
-                    let words = &sentence.words[j..k];
                     let lc_words = &sentence.lc_words[j..k];
-
                     let candidate = candidates.entry(lc_words).or_default();
-                    candidate.surfaces.push(words);
+
+                    candidate.surfaces.push(&sentence.words[j..k]);
                     candidate.lc_surfaces.push(lc_words);
-                    candidate.uq_terms.push(&sentence.uq_terms);
+                    candidate.uq_terms.push(&sentence.uq_terms[j..k]);
                     candidate.sentence_ids.push(idx);
                     candidate.offsets.push(j + shift);
                 }

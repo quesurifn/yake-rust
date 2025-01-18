@@ -894,6 +894,26 @@ mod tests {
     }
 
     #[test]
+    fn with_stopword_in_the_middle() {
+        let text = "Game of Thrones";
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual =
+            Yake::new(stopwords, Config { remove_duplicates: false, ..Config::default() }).get_n_best(text, Some(1));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected: Results = vec![ResultItem { raw: "Thrones".into(), keyword: "thrones".into(), score: 0.086 }];
+
+        // LIAAD REFERENCE:
+        // "Game of Thrones" 0.01380
+
+        // REASONS FOR DISCREPANCY:
+        // - yake-rust drops "Game of Thrones" because it contains a stopword (filter_candidates)
+        //   but LIAAD/yake correctly only cares about stopwords in the leading and trailing words.
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn google_sample_single_ngram() {
         let text = include_str!("test_google.txt"); // LIAAD/yake sample text
         let stopwords = StopWords::predefined("en").unwrap();

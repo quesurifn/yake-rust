@@ -1,12 +1,12 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::type_complexity)]
 
-use std::cmp::min;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 use std::ops::Deref;
 
 use indexmap::{IndexMap, IndexSet};
+use plural_helper::PluralHelper;
 use preprocessor::{split_into_sentences, split_into_words};
 use stats::{mean, median, stddev};
 
@@ -14,6 +14,7 @@ use crate::levenshtein::levenshtein_ratio;
 pub use crate::stopwords::StopWords;
 
 mod levenshtein;
+mod plural_helper;
 mod preprocessor;
 mod stopwords;
 
@@ -582,25 +583,6 @@ impl Yake {
 
 fn word_is_alphanumeric_and_hyphen(word: impl AsRef<str>) -> bool {
     word.as_ref().chars().all(|ch| ch.is_alphanumeric() || ch == '-')
-}
-
-trait PluralHelper {
-    /// Omit the last `s` symbol in a string.
-    ///
-    /// How to use: `some_string.to_lowercase().to_single()`
-    fn to_single(self) -> Self;
-}
-
-impl<'a> PluralHelper for &'a str {
-    fn to_single(self) -> &'a str {
-        if self.chars().count() > 3 && (self.ends_with(['s', 'S'])) {
-            let mut chars = self.chars();
-            chars.next_back();
-            chars.as_str()
-        } else {
-            self
-        }
-    }
 }
 
 #[cfg(test)]

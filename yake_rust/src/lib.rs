@@ -1183,4 +1183,27 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn arabic_sample_defaults() {
+        let text = include_str!("test_ar.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("ar").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected = [
+            ("عبد السلام العجيلي", "عبد السلام العجيلي", 0.0105),
+            ("اللغة العربية الأربعاء", "اللغة العربية الأربعاء", 0.0139),
+            ("عبد النبي اصطيف", "عبد النبي اصطيف", 0.0142),
+            ("العجيلي في مرآة", "العجيلي في مرآة", 0.0177),
+            ("مرآة النقد المقارن", "مرآة النقد المقارن", 0.0183), // LIAAD REFERENCE: 0.018
+            ("السلام العجيلي", "السلام العجيلي", 0.0198),
+            ("اللغة العربية", "اللغة العربية", 0.0207),
+            ("مرآة النقد", "مرآة النقد", 0.0255), // LIAAD REFERENCE: 0.025
+            ("اللغة العربية بدمشق", "اللغة العربية بدمشق", 0.0261),
+            ("مجمع اللغة العربية", "مجمع اللغة العربية", 0.0281),
+        ];
+
+        assert_eq!(actual, expected);
+    }
 }

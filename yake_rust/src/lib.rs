@@ -28,7 +28,7 @@ type UTerm = String;
 
 type Sentences = Vec<Sentence>;
 /// Key is `stems.join(" ")`
-type Candidates<'s> = IndexMap<&'s [LString], PreCandidate<'s>>;
+type Candidates<'s> = IndexMap<&'s [LString], Candidate<'s>>;
 type Features<'s> = HashMap<&'s LString, TermStats>;
 type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
 type Contexts<'s> = HashMap<&'s UTerm, (Vec<&'s UTerm>, Vec<&'s UTerm>)>;
@@ -119,9 +119,10 @@ struct Sentence {
     pub length: usize,
 }
 
+/// N-gram, a sequence of N terms.
 #[derive(Debug, Default, Clone)]
-struct PreCandidate<'s> {
-    pub surfaces: Vec<&'s [String]>,
+struct Candidate<'s> {
+    pub occurrences: Vec<&'s [RawString]>,
     pub lc_terms: &'s [LString],
     pub uq_terms: &'s [UTerm],
     pub score: f64,
@@ -186,7 +187,7 @@ impl Yake {
         let mut results = ngrams
             .into_iter()
             .map(|(_, candidate)| {
-                let raw = candidate.surfaces[0].join(" ");
+                let raw = candidate.occurrences[0].join(" ");
                 let keyword = candidate.lc_terms.join(" ");
                 ResultItem { raw, keyword, score: candidate.score }
             })
@@ -508,7 +509,7 @@ impl Yake {
                     sum_ = 0.999999999;
                 }
 
-                let tf = v.surfaces.len() as f64;
+                let tf = v.occurrences.len() as f64;
                 v.score = prod_ / (tf * (1.0 + sum_));
             }
         }
@@ -550,7 +551,7 @@ impl Yake {
     }
 
     fn ngram_selection<'s>(&self, n: usize, sentences: &'s Sentences) -> Candidates<'s> {
-        let mut candidates: IndexMap<&'s [LString], PreCandidate<'_>> = Candidates::new();
+        let mut candidates: IndexMap<&'s [LString], Candidate<'_>> = Candidates::new();
         for (idx, sentence) in sentences.iter().enumerate() {
             let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
 
@@ -563,7 +564,7 @@ impl Yake {
                     let lc_words = &sentence.lc_words[j..k];
                     let candidate = candidates.entry(lc_words).or_default();
 
-                    candidate.surfaces.push(&sentence.words[j..k]);
+                    candidate.occurrences.push(&sentence.words[j..k]);
                     candidate.lc_terms = lc_words;
                     candidate.uq_terms = &sentence.uq_terms[j..k];
                 }

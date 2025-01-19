@@ -116,7 +116,6 @@ struct Sentence {
     pub is_punctuation: Vec<bool>,
     pub lc_words: Vec<LString>,
     pub uq_terms: Vec<UTerm>,
-    pub length: usize,
 }
 
 /// N-gram, a sequence of N terms.
@@ -248,7 +247,7 @@ impl Yake {
                 let lc_words = words.iter().map(|w| w.to_lowercase()).collect::<Vec<LString>>();
                 let uq_terms = lc_words.iter().map(|w| self.get_unique_term(w)).collect();
                 let is_punctuation = words.iter().map(|w| self.word_is_punctuation(w)).collect();
-                Sentence { length: words.len(), words, lc_words, uq_terms, is_punctuation }
+                Sentence { words, lc_words, uq_terms, is_punctuation }
             })
             .collect()
     }
@@ -257,7 +256,7 @@ impl Yake {
         let mut words = Words::new();
 
         for (idx, sentence) in sentences.iter().enumerate() {
-            let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
+            let shift = sentences[0..idx].iter().map(|s| s.words.len()).sum::<usize>();
 
             for (w_idx, ((word, is_punctuation), index)) in
                 sentence.words.iter().zip(&sentence.is_punctuation).zip(&sentence.uq_terms).enumerate()
@@ -551,12 +550,11 @@ impl Yake {
     }
 
     fn ngram_selection<'s>(&self, n: usize, sentences: &'s Sentences) -> Candidates<'s> {
-        let mut candidates: IndexMap<&'s [LString], Candidate<'_>> = Candidates::new();
-        for (idx, sentence) in sentences.iter().enumerate() {
-            let shift = sentences[0..idx].iter().map(|s| s.length).sum::<usize>();
-
-            for j in 0..sentence.length {
-                for k in j + 1..min(j + 1 + min(sentence.length, n), sentence.length + 1) {
+        let mut candidates = Candidates::new();
+        for sentence in sentences.iter() {
+            let length = sentence.words.len();
+            for j in 0..length {
+                for k in j + 1..min(j + 1 + min(length, n), length + 1) {
                     if (j..k).is_empty() {
                         continue;
                     }

@@ -1071,7 +1071,7 @@ mod tests {
     }
 
     // #[test]
-    // fn portugese_sport_sample_defaults() {
+    // fn portuguese_sport_sample_defaults() {
     //     let text = include_str!("test_pt_1.txt"); // LIAAD/yake sample text
     //     let stopwords = StopWords::predefined("pt").unwrap();
     //     let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
@@ -1091,4 +1091,27 @@ mod tests {
 
     //     assert_eq!(actual, expected);
     // }
+
+    #[test]
+    fn portuguese_tourism_sample_defaults() {
+        let text = include_str!("test_pt_2.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("pt").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected = [
+            ("Alvor", "alvor", 0.0165),
+            ("Rio Alvor", "rio alvor", 0.0336),
+            ("Ria de Alvor", "ria de alvor", 0.0488),
+            ("encantadora vila", "encantadora vila", 0.0575),
+            ("Algarve", "algarve", 0.0774),
+            ("impressionantes de Portugal", "impressionantes de portugal", 0.0844),
+            ("estuário do Rio", "estuário do rio", 0.0907),
+            ("vila", "vila", 0.1017),
+            ("Ria", "ria", 0.1053),
+            ("Oceano Atlântico", "oceano atlântico", 0.1357),
+        ];
+
+        assert_eq!(actual, expected);
+    }
 }

@@ -122,8 +122,8 @@ struct Sentence {
 #[derive(Debug, Default, Clone)]
 struct PreCandidate<'s> {
     pub surfaces: Vec<&'s [String]>,
-    pub lc_surfaces: Vec<&'s [LString]>,
-    pub uq_terms: Vec<&'s [UTerm]>,
+    pub lc_terms: &'s [LString],
+    pub uq_terms: &'s [UTerm],
     pub offsets: Vec<usize>,
     pub sentence_ids: Vec<usize>,
     pub score: f64,
@@ -189,7 +189,7 @@ impl Yake {
             .into_iter()
             .map(|(_, candidate)| {
                 let raw = candidate.surfaces[0].join(" ");
-                let keyword = candidate.lc_surfaces[0].join(" ");
+                let keyword = candidate.lc_terms.join(" ");
                 ResultItem { raw, keyword, score: candidate.score }
             })
             .collect::<Vec<_>>();
@@ -473,7 +473,9 @@ impl Yake {
 
     fn candidate_weighting<'s>(features: Features<'s>, contexts: &Contexts<'s>, candidates: &mut Candidates<'s>) {
         for v in candidates.values_mut() {
-            for (&candidate, &u_terms) in v.lc_surfaces.iter().zip(&v.uq_terms) {
+            let candidate = v.lc_terms;
+            let u_terms = v.uq_terms;
+            {
                 let tokens = candidate;
                 let mut prod_ = 1.0;
                 let mut sum_ = 0.0;
@@ -525,8 +527,8 @@ impl Yake {
         // fixme: filter right before inserting into the set to optimize
         candidates.retain(|_k, v| !{
             // get the words from the first occurring surface form
-            let first_lc_surface = v.lc_surfaces[0];
-            let last_lc_surface = v.lc_surfaces.last().unwrap();
+            let first_lc_surface = v.lc_terms;
+            let last_lc_surface = v.lc_terms;
             let lc_words: HashSet<&LString> = HashSet::from_iter(first_lc_surface);
 
             let has_float = || lc_words.iter().any(|w| w.parse::<f64>().is_ok());
@@ -566,8 +568,8 @@ impl Yake {
                     let candidate = candidates.entry(lc_words).or_default();
 
                     candidate.surfaces.push(&sentence.words[j..k]);
-                    candidate.lc_surfaces.push(lc_words);
-                    candidate.uq_terms.push(&sentence.uq_terms[j..k]);
+                    candidate.lc_terms = lc_words;
+                    candidate.uq_terms = &sentence.uq_terms[j..k];
                     candidate.sentence_ids.push(idx);
                     candidate.offsets.push(j + shift);
                 }

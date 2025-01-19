@@ -1103,6 +1103,7 @@ mod tests {
             ("Ria", "ria", 0.1053),
             ("Oceano Atlântico", "oceano atlântico", 0.1357),
         ];
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }
@@ -1126,6 +1127,7 @@ mod tests {
             ("José Antonio Primo", "josé antonio primo", 0.0589),
             ("José Calvo Sotelo", "josé calvo sotelo", 0.0596),
         ];
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }
@@ -1149,6 +1151,7 @@ mod tests {
             ("kurs franka poniżej", "kurs franka poniżej", 0.0758),
             ("Wildersa", "wildersa", 0.0765),
         ];
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }
@@ -1218,6 +1221,7 @@ mod tests {
             ("Exército israelita", "exército israelita", 0.0368),
             ("Exército israelita voltou", "exército israelita voltou", 0.0639),
         ];
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }
@@ -1236,6 +1240,7 @@ mod tests {
             ("Japan official", "japan official", 0.0046),
             ("official says highly", "official says highly", 0.0050),
         ];
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }

@@ -1287,4 +1287,27 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    // #[test]
+    // fn dataset_text_5_defaults() {
+    //     let text = include_str!("test_data_5.txt"); // LIAAD/yake sample text
+    //     let stopwords = StopWords::predefined("en").unwrap();
+    //     let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+    //     // leave only 4 digits
+    //     actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+    //     let expected = [
+    //         ("Handoff Trigger Table", "handoff trigger table", 0.0007),
+    //         ("Handoff", "handoff", 0.0010),
+    //         ("WLAN Networks ABSTRACT", "wlan networks abstract", 0.0019),
+    //         ("Vertical handoff", "vertical handoff", 0.0020),
+    //         ("Handoff Trigger", "handoff trigger", 0.0021),
+    //         ("proactive handoff scheme", "proactive handoff scheme", 0.0021),
+    //         ("HTT Method Figure", "htt method figure", 0.0022),
+    //         ("WLAN", "wlan", 0.0023),
+    //         ("ABSTRACT Vertical handoff", "abstract vertical handoff", 0.0030),
+    //         ("traditional handoff scheme", "traditional handoff scheme", 0.0033),
+    //     ];
+
+    //     assert_eq!(actual, expected);
+    // }
 }

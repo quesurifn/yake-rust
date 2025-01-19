@@ -554,7 +554,7 @@ impl Yake {
         for sentence in sentences.iter() {
             let length = sentence.words.len();
             for j in 0..length {
-                for k in j + 1..min(j + 1 + min(length, n), length + 1) {
+                for k in (j + 1..length + 1).take(n) {
                     if (j..k).is_empty() {
                         continue;
                     }

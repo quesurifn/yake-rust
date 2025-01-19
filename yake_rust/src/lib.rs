@@ -1114,4 +1114,27 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn spanish_sample_defaults() {
+        let text = include_str!("test_es.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("es").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected = [
+            ("Guerra Civil Española", "guerra civil española", 0.0032),
+            ("Guerra Civil", "guerra civil", 0.0130),
+            ("Civil Española", "civil española", 0.0153),
+            ("Partido Socialista Obrero", "partido socialista obrero", 0.0283),
+            ("empezó la Guerra", "empezó la guerra", 0.0333),
+            ("Socialista Obrero Español", "socialista obrero español", 0.0411),
+            ("José Castillo", "josé castillo", 0.0426),
+            ("Española", "española", 0.0566),
+            ("José Antonio Primo", "josé antonio primo", 0.0589),
+            ("José Calvo Sotelo", "josé calvo sotelo", 0.0596),
+        ];
+
+        assert_eq!(actual, expected);
+    }
 }

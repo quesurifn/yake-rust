@@ -1176,6 +1176,9 @@ mod tests {
             ("yüksek", "yüksek", 0.0509),         // LIAAD REFERENCE: 0.0513
         ];
 
+        // REASONS FOR DISCREPANCY:
+        // - Difference in tokenization.
+
         assert_eq!(actual, expected);
     }
 

@@ -110,6 +110,12 @@ pub struct ResultItem {
     pub score: f64,
 }
 
+impl PartialEq<(&str, &str, f64)> for ResultItem {
+    fn eq(&self, (raw, keyword, score): &(&str, &str, f64)) -> bool {
+        self.raw.eq(raw) && self.keyword.eq(keyword) && self.score.eq(score)
+    }
+}
+
 #[derive(Debug, Clone)]
 struct Sentence {
     pub words: Vec<RawString>,
@@ -591,8 +597,6 @@ mod tests {
 
     use super::*;
 
-    type Results = Vec<ResultItem>;
-
     #[test]
     fn short() {
         let text = "this is a keyword";
@@ -600,7 +604,7 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(1));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![ResultItem { raw: "keyword".into(), keyword: "keyword".into(), score: 0.1583 }];
+        let expected = [("keyword", "keyword", 0.1583)];
         // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
@@ -615,10 +619,7 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(3));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "Machine".into(), keyword: "machine".into(), score: 0.1583 },
-            ResultItem { raw: "learning".into(), keyword: "learning".into(), score: 0.1583 },
-        ];
+        let expected = [("Machine", "machine", 0.1583), ("learning", "learning", 0.1583)];
         // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
@@ -631,10 +632,7 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(2));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "Apple".into(), keyword: "apple".into(), score: 0.1448 },
-            ResultItem { raw: "laptop".into(), keyword: "laptop".into(), score: 0.1583 },
-        ];
+        let expected = [("Apple", "apple", 0.1448), ("laptop", "laptop", 0.1583)];
         // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
@@ -649,11 +647,8 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(3));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "headphones".into(), keyword: "headphones".into(), score: 0.1141 },
-            ResultItem { raw: "Saturday".into(), keyword: "saturday".into(), score: 0.2111 },
-            ResultItem { raw: "Starting".into(), keyword: "starting".into(), score: 0.4096 },
-        ];
+        let expected =
+            [("headphones", "headphones", 0.1141), ("Saturday", "saturday", 0.2111), ("Starting", "starting", 0.4096)];
         // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
@@ -666,8 +661,7 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(1));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results =
-            vec![ResultItem { raw: "great deal".into(), keyword: "great deal".into(), score: 0.0257 }];
+        let expected = [("great deal", "great deal", 0.0257)];
         // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
@@ -680,10 +674,7 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(2));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "smartwatch".into(), keyword: "smartwatch".into(), score: 0.2025 },
-            ResultItem { raw: "phone".into(), keyword: "phone".into(), score: 0.2474 },
-        ];
+        let expected = [("smartwatch", "smartwatch", 0.2025), ("phone", "phone", 0.2474)];
         // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
@@ -696,11 +687,7 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(3));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "smartwatch".into(), keyword: "smartwatch".into(), score: 0.2025 },
-            ResultItem { raw: "phone".into(), keyword: "phone".into(), score: 0.4949 },
-            ResultItem { raw: "phones".into(), keyword: "phones".into(), score: 0.4949 },
-        ];
+        let expected = [("smartwatch", "smartwatch", 0.2025), ("phone", "phone", 0.4949), ("phones", "phones", 0.4949)];
         // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
@@ -713,8 +700,7 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(1));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results =
-            vec![ResultItem { raw: "high tech".into(), keyword: "high tech".into(), score: 0.0494 }];
+        let expected = [("high tech", "high tech", 0.0494)];
         // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
@@ -727,8 +713,7 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(1));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results =
-            vec![ResultItem { raw: "high-tech".into(), keyword: "high-tech".into(), score: 0.1583 }];
+        let expected = [("high-tech", "high-tech", 0.1583)];
         // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
@@ -741,10 +726,10 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(3));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "weekly newsletter".into(), keyword: "weekly newsletter".into(), score: 0.0494 },
-            ResultItem { raw: "newsletter".into(), keyword: "newsletter".into(), score: 0.1583 },
-            ResultItem { raw: "weekly".into(), keyword: "weekly".into(), score: 0.2974 },
+        let expected = [
+            ("weekly newsletter", "weekly newsletter", 0.0494),
+            ("newsletter", "newsletter", 0.1583),
+            ("weekly", "weekly", 0.2974),
         ];
         // Results agree with reference implementation LIAAD/yake
 
@@ -760,12 +745,12 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(5));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "weekly newsletter".into(), keyword: "weekly newsletter".into(), score: 0.0780 },
-            ResultItem { raw: "newsletter".into(), keyword: "newsletter".into(), score: 0.2005 },
-            ResultItem { raw: "weekly".into(), keyword: "weekly".into(), score: 0.3607 },
-            ResultItem { raw: "great deals".into(), keyword: "great deals".into(), score: 0.4456 },
-            ResultItem { raw: "high-tech drones".into(), keyword: "high-tech drones".into(), score: 0.4456 },
+        let expected = [
+            ("weekly newsletter", "weekly newsletter", 0.0780),
+            ("newsletter", "newsletter", 0.2005),
+            ("weekly", "weekly", 0.3607),
+            ("great deals", "great deals", 0.4456),
+            ("high-tech drones", "high-tech drones", 0.4456),
         ];
         // Results agree with reference implementation LIAAD/yake
 
@@ -781,12 +766,12 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(5));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "weekly newsletter".into(), keyword: "weekly newsletter".into(), score: 0.0780 },
-            ResultItem { raw: "newsletter".into(), keyword: "newsletter".into(), score: 0.2005 },
-            ResultItem { raw: "weekly".into(), keyword: "weekly".into(), score: 0.3607 },
-            ResultItem { raw: "great deals".into(), keyword: "great deals".into(), score: 0.4456 },
-            ResultItem { raw: "high-tech drones".into(), keyword: "high-tech drones".into(), score: 0.4456 },
+        let expected = [
+            ("weekly newsletter", "weekly newsletter", 0.0780),
+            ("newsletter", "newsletter", 0.2005),
+            ("weekly", "weekly", 0.3607),
+            ("great deals", "great deals", 0.4456),
+            ("high-tech drones", "high-tech drones", 0.4456),
         ];
         // Results agree with reference implementation LIAAD/yake
 
@@ -801,12 +786,12 @@ mod tests {
             Yake::new(stopwords, Config { ngrams: 2, window_size: 2, ..Default::default() }).get_n_best(text, Some(5));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "Machine learning".into(), keyword: "machine learning".into(), score: 0.1346 },
-            ResultItem { raw: "growing field".into(), keyword: "growing field".into(), score: 0.1672 },
-            ResultItem { raw: "learning".into(), keyword: "learning".into(), score: 0.2265 },
-            ResultItem { raw: "Machine".into(), keyword: "machine".into(), score: 0.2341 },
-            ResultItem { raw: "growing".into(), keyword: "growing".into(), score: 0.2799 },
+        let expected = [
+            ("Machine learning", "machine learning", 0.1346),
+            ("growing field", "growing field", 0.1672),
+            ("learning", "learning", 0.2265),
+            ("Machine", "machine", 0.2341),
+            ("growing", "growing", 0.2799),
         ];
         // Results agree with reference implementation LIAAD/yake
 
@@ -820,11 +805,8 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(3));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "yellow bananas".into(), keyword: "yellow bananas".into(), score: 0.0682 },
-            ResultItem { raw: "buy".into(), keyword: "buy".into(), score: 0.1428 },
-            ResultItem { raw: "yellow".into(), keyword: "yellow".into(), score: 0.1428 },
-        ];
+        let expected =
+            [("yellow bananas", "yellow bananas", 0.0682), ("buy", "buy", 0.1428), ("yellow", "yellow", 0.1428)];
         // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
@@ -838,10 +820,10 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 2, ..Default::default() }).get_n_best(text, Some(3));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "hundred yellow".into(), keyword: "hundred yellow".into(), score: 0.0446 },
-            ResultItem { raw: "yellow bananas".into(), keyword: "yellow bananas".into(), score: 0.1017 },
-            ResultItem { raw: "day".into(), keyword: "day".into(), score: 0.1428 },
+        let expected = [
+            ("hundred yellow", "hundred yellow", 0.0446),
+            ("yellow bananas", "yellow bananas", 0.1017),
+            ("day", "day", 0.1428),
         ];
         // Results agree with reference implementation LIAAD/yake
 
@@ -856,7 +838,7 @@ mod tests {
             Yake::new(stopwords, Config { remove_duplicates: false, ..Config::default() }).get_n_best(text, Some(1));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![ResultItem { raw: "Thrones".into(), keyword: "thrones".into(), score: 0.086 }];
+        let expected = [("Thrones", "thrones", 0.086)];
 
         // LIAAD REFERENCE:
         // "Game of Thrones" 0.01380
@@ -875,17 +857,17 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config { ngrams: 1, ..Default::default() }).get_n_best(text, Some(10));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "Google".into(), keyword: "google".into(), score: 0.0251 },
-            ResultItem { raw: "Kaggle".into(), keyword: "kaggle".into(), score: 0.0273 },
-            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.08 },
-            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0983 },
-            ResultItem { raw: "platform".into(), keyword: "platform".into(), score: 0.124 },
-            ResultItem { raw: "service".into(), keyword: "service".into(), score: 0.1316 },
-            ResultItem { raw: "acquiring".into(), keyword: "acquiring".into(), score: 0.1511 },
-            ResultItem { raw: "learning".into(), keyword: "learning".into(), score: 0.1621 },
-            ResultItem { raw: "Goldbloom".into(), keyword: "goldbloom".into(), score: 0.1625 },
-            ResultItem { raw: "machine".into(), keyword: "machine".into(), score: 0.1672 },
+        let expected = [
+            ("Google", "google", 0.0251),
+            ("Kaggle", "kaggle", 0.0273),
+            ("data", "data", 0.08),
+            ("science", "science", 0.0983),
+            ("platform", "platform", 0.124),
+            ("service", "service", 0.1316),
+            ("acquiring", "acquiring", 0.1511),
+            ("learning", "learning", 0.1621),
+            ("Goldbloom", "goldbloom", 0.1625),
+            ("machine", "machine", 0.1672),
         ];
         // Results agree with reference implementation LIAAD/yake
 
@@ -899,25 +881,17 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "Google".into(), keyword: "google".into(), score: 0.0251 },
-            ResultItem { raw: "Kaggle".into(), keyword: "kaggle".into(), score: 0.0273 },
-            ResultItem { raw: "CEO Anthony Goldbloom".into(), keyword: "ceo anthony goldbloom".into(), score: 0.0483 },
-            ResultItem { raw: "data science".into(), keyword: "data science".into(), score: 0.055 },
-            ResultItem {
-                raw: "acquiring data science".into(),
-                keyword: "acquiring data science".into(),
-                score: 0.0603,
-            },
-            ResultItem { raw: "Google Cloud Platform".into(), keyword: "google cloud platform".into(), score: 0.0746 },
-            ResultItem { raw: "data".into(), keyword: "data".into(), score: 0.08 },
-            ResultItem { raw: "San Francisco".into(), keyword: "san francisco".into(), score: 0.0914 },
-            ResultItem {
-                raw: "Anthony Goldbloom declined".into(),
-                keyword: "anthony goldbloom declined".into(),
-                score: 0.0974,
-            },
-            ResultItem { raw: "science".into(), keyword: "science".into(), score: 0.0983 },
+        let expected = [
+            ("Google", "google", 0.0251),
+            ("Kaggle", "kaggle", 0.0273),
+            ("CEO Anthony Goldbloom", "ceo anthony goldbloom", 0.0483),
+            ("data science", "data science", 0.055),
+            ("acquiring data science", "acquiring data science", 0.0603),
+            ("Google Cloud Platform", "google cloud platform", 0.0746),
+            ("data", "data", 0.08),
+            ("San Francisco", "san francisco", 0.0914),
+            ("Anthony Goldbloom declined", "anthony goldbloom declined", 0.0974),
+            ("science", "science", 0.0983),
         ];
         // Results agree with reference implementation LIAAD/yake
 
@@ -931,25 +905,17 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "Gitter".into(), keyword: "gitter".into(), score: 0.0190 },
-            ResultItem { raw: "GitLab".into(), keyword: "gitlab".into(), score: 0.0478 },
-            ResultItem {
-                raw: "acquires software chat".into(),
-                keyword: "acquires software chat".into(),
-                score: 0.0479,
-            },
-            ResultItem { raw: "chat startup Gitter".into(), keyword: "chat startup gitter".into(), score: 0.0512 },
-            ResultItem { raw: "software chat startup".into(), keyword: "software chat startup".into(), score: 0.0612 },
-            ResultItem { raw: "Gitter chat".into(), keyword: "gitter chat".into(), score: 0.0684 },
-            ResultItem {
-                raw: "GitLab acquires software".into(),
-                keyword: "gitlab acquires software".into(),
-                score: 0.0685,
-            },
-            ResultItem { raw: "startup".into(), keyword: "startup".into(), score: 0.0783 },
-            ResultItem { raw: "software".into(), keyword: "software".into(), score: 0.0879 },
-            ResultItem { raw: "code".into(), keyword: "code".into(), score: 0.0879 },
+        let expected = [
+            ("Gitter", "gitter", 0.0190),
+            ("GitLab", "gitlab", 0.0478),
+            ("acquires software chat", "acquires software chat", 0.0479),
+            ("chat startup Gitter", "chat startup gitter", 0.0512),
+            ("software chat startup", "software chat startup", 0.0612),
+            ("Gitter chat", "gitter chat", 0.0684),
+            ("GitLab acquires software", "gitlab acquires software", 0.0685),
+            ("startup", "startup", 0.0783),
+            ("software", "software", 0.0879),
+            ("code", "code", 0.0879),
         ];
         // Results agree with reference implementation LIAAD/yake
 
@@ -963,17 +929,17 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "Genius".into(), keyword: "genius".into(), score: 0.0261 },
-            ResultItem { raw: "company".into(), keyword: "company".into(), score: 0.0263 },
-            ResultItem { raw: "Genius quietly laid".into(), keyword: "genius quietly laid".into(), score: 0.027 },
-            ResultItem { raw: "company quietly laid".into(), keyword: "company quietly laid".into(), score: 0.0392 },
-            ResultItem { raw: "media company".into(), keyword: "media company".into(), score: 0.0404 },
-            ResultItem { raw: "Lehman".into(), keyword: "lehman".into(), score: 0.0412 },
-            ResultItem { raw: "quietly laid".into(), keyword: "quietly laid".into(), score: 0.0583 },
-            ResultItem { raw: "Tom Lehman told".into(), keyword: "tom lehman told".into(), score: 0.0603 },
-            ResultItem { raw: "video".into(), keyword: "video".into(), score: 0.0650 },
-            ResultItem { raw: "co-founder Tom Lehman".into(), keyword: "co-founder tom lehman".into(), score: 0.0669 },
+        let expected = [
+            ("Genius", "genius", 0.0261),
+            ("company", "company", 0.0263),
+            ("Genius quietly laid", "genius quietly laid", 0.027),
+            ("company quietly laid", "company quietly laid", 0.0392),
+            ("media company", "media company", 0.0404),
+            ("Lehman", "lehman", 0.0412),
+            ("quietly laid", "quietly laid", 0.0583),
+            ("Tom Lehman told", "tom lehman told", 0.0603),
+            ("video", "video", 0.0650),
+            ("co-founder Tom Lehman", "co-founder tom lehman", 0.0669),
         ];
         // Results agree with reference implementation LIAAD/yake
 
@@ -987,37 +953,17 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "Vereinigten Staaten".into(), keyword: "vereinigten staaten".into(), score: 0.0152 }, // LIAAD REFERENCE: 0.151
-            ResultItem {
-                raw: "Präsidenten Donald Trump".into(),
-                keyword: "präsidenten donald trump".into(),
-                score: 0.0182,
-            },
-            ResultItem { raw: "Donald Trump".into(), keyword: "donald trump".into(), score: 0.0211 }, // LIAAD REFERENCE: 0.21
-            ResultItem { raw: "trifft Donald Trump".into(), keyword: "trifft donald trump".into(), score: 0.0231 }, // LIAAD REFERENCE: 0.23
-            ResultItem { raw: "Trump".into(), keyword: "trump".into(), score: 0.0240 },
-            ResultItem {
-                raw: "Trumps Finanzminister Steven".into(),
-                keyword: "trumps finanzminister steven".into(),
-                score: 0.0243,
-            },
-            ResultItem {
-                raw: "Kanzlerin Angela Merkel".into(),
-                keyword: "kanzlerin angela merkel".into(),
-                score: 0.0275,
-            }, // LIAAD REFERENCE: 0.273
-            ResultItem {
-                raw: "deutsche Kanzlerin Angela".into(),
-                keyword: "deutsche kanzlerin angela".into(),
-                score: 0.0316,
-            }, // LIAAD REFERENCE: 0.314
-            ResultItem { raw: "Merkel trifft Donald".into(), keyword: "merkel trifft donald".into(), score: 0.0353 }, // LIAAD REFERENCE: 0.351
-            ResultItem {
-                raw: "Exportnation Deutschland".into(),
-                keyword: "exportnation deutschland".into(),
-                score: 0.038,
-            }, // LIAAD REFERENCE: 0.0379
+        let expected = [
+            ("Vereinigten Staaten", "vereinigten staaten", 0.0152), // LIAAD REFERENCE: 0.151
+            ("Präsidenten Donald Trump", "präsidenten donald trump", 0.0182),
+            ("Donald Trump", "donald trump", 0.0211), // LIAAD REFERENCE: 0.21
+            ("trifft Donald Trump", "trifft donald trump", 0.0231), // LIAAD REFERENCE: 0.23
+            ("Trump", "trump", 0.0240),
+            ("Trumps Finanzminister Steven", "trumps finanzminister steven", 0.0243),
+            ("Kanzlerin Angela Merkel", "kanzlerin angela merkel", 0.0275), // LIAAD REFERENCE: 0.273
+            ("deutsche Kanzlerin Angela", "deutsche kanzlerin angela", 0.0316), // LIAAD REFERENCE: 0.314
+            ("Merkel trifft Donald", "merkel trifft donald", 0.0353),       // LIAAD REFERENCE: 0.351
+            ("Exportnation Deutschland", "exportnation deutschland", 0.038), // LIAAD REFERENCE: 0.0379
         ];
 
         // REASONS FOR DISCREPANCY:
@@ -1045,17 +991,17 @@ mod tests {
         let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected: Results = vec![
-            ResultItem { raw: "Gogh Museum".into(), keyword: "gogh museum".into(), score: 0.0125 },
-            ResultItem { raw: "Gogh".into(), keyword: "gogh".into(), score: 0.0150 },
-            ResultItem { raw: "Museum".into(), keyword: "museum".into(), score: 0.0438 },
-            ResultItem { raw: "Vincent van Gogh".into(), keyword: "vincent van gogh".into(), score: 0.063 }, // LIAAD: 0.0111
-            ResultItem { raw: "brieven".into(), keyword: "brieven".into(), score: 0.0635 },
-            ResultItem { raw: "Vincent".into(), keyword: "vincent".into(), score: 0.0643 },
-            ResultItem { raw: "Goghs schilderijen".into(), keyword: "goghs schilderijen".into(), score: 0.1009 },
-            ResultItem { raw: "Gogh verging".into(), keyword: "gogh verging".into(), score: 0.1215 },
-            ResultItem { raw: "Goghs".into(), keyword: "goghs".into(), score: 0.1651 },
-            ResultItem { raw: "schrijven".into(), keyword: "schrijven".into(), score: 0.1704 },
+        let expected = [
+            ("Gogh Museum", "gogh museum", 0.0125),
+            ("Gogh", "gogh", 0.0150),
+            ("Museum", "museum", 0.0438),
+            ("Vincent van Gogh", "vincent van gogh", 0.063), // LIAAD: 0.0111
+            ("brieven", "brieven", 0.0635),
+            ("Vincent", "vincent", 0.0643),
+            ("Goghs schilderijen", "goghs schilderijen", 0.1009),
+            ("Gogh verging", "gogh verging", 0.1215),
+            ("Goghs", "goghs", 0.1651),
+            ("schrijven", "schrijven", 0.1704),
         ];
 
         // REASONS FOR DISCREPANCY:

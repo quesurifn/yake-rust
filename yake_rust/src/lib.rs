@@ -558,7 +558,6 @@ impl Yake {
                 || lc_terms.len() > maximum_word_number
                 || has_non_alphanumeric()
                 || lc_terms[0].len() < 3 // fixme: magic constant
-                || lc_terms.last().unwrap().len() < 3
         });
     }
 

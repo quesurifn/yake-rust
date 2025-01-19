@@ -29,7 +29,7 @@ type UTerm = String;
 type Sentences = Vec<Sentence>;
 /// Key is `stems.join(" ")`
 type Candidates<'s> = IndexMap<&'s [LString], PreCandidate<'s>>;
-type Features<'s> = HashMap<&'s LString, YakeCandidate>;
+type Features<'s> = HashMap<&'s LString, TermStats>;
 type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
 type Contexts<'s> = HashMap<&'s UTerm, (Vec<&'s UTerm>, Vec<&'s UTerm>)>;
 
@@ -77,7 +77,7 @@ impl<'s> Occurrence<'s> {
 }
 
 #[derive(Debug, Default)]
-struct YakeCandidate {
+struct TermStats {
     is_stopword: bool,
     /// Term frequency. The total number of occurrences in the text.
     tf: f64,
@@ -379,7 +379,7 @@ impl Yake {
         for (lc_word, u_term) in candidate_words {
             let occurrences = words.get(u_term).unwrap();
 
-            let mut cand = YakeCandidate {
+            let mut stats = TermStats {
                 is_stopword: self.is_stopword(lc_word),
                 tf: occurrences.len() as f64,
                 ..Default::default()
@@ -389,20 +389,20 @@ impl Yake {
                 // todo: revert back to the code from 5a6e4747, as tags change nothing
                 let tags: Vec<Tag> = occurrences.iter().map(|occ| self.get_tag(occ)).collect();
                 // We consider the occurrence of acronyms through a heuristic, where all the letters of the word are capitals.
-                cand.tf_a = tags.iter().filter(|&tag| *tag == Tag::Acronym).count() as f64;
+                stats.tf_a = tags.iter().filter(|&tag| *tag == Tag::Acronym).count() as f64;
                 // We give extra attention to any term beginning with a capital letter (excluding the beginning of sentences).
-                cand.tf_n = tags.iter().filter(|&tag| *tag == Tag::Uppercase).count() as f64;
+                stats.tf_n = tags.iter().filter(|&tag| *tag == Tag::Uppercase).count() as f64;
 
                 // The casing aspect of a term is an important feature when considering the extraction
                 // of keywords. The underlying rationale is that uppercase terms tend to be more
                 // relevant than lowercase ones.
-                cand.casing = cand.tf_a.max(cand.tf_n);
+                stats.casing = stats.tf_a.max(stats.tf_n);
 
                 // The more often the candidate term occurs with a capital letter, the more important
                 // it is considered. This means that a candidate term that occurs with a capital letter
                 // ten times within ten occurrences will be given a higher value (4.34) than a candidate
                 // term that occurs with a capital letter five times within five occurrences (3.10).
-                cand.casing /= 1.0 + cand.tf.ln(); // todo: no 1+ in the paper
+                stats.casing /= 1.0 + stats.tf.ln(); // todo: no 1+ in the paper
             }
 
             {
@@ -428,44 +428,44 @@ impl Yake {
                 let sentence_ids: HashSet<_> = occurrences.iter().map(|o| o.idx).collect();
                 // When the candidate term only appears in the first sentence, the median function
                 // can return a value of 0. To guarantee position > 0, a constant 3 > e=2.71 is added.
-                cand.position = 3.0 + median(sentence_ids.into_iter()).unwrap();
+                stats.position = 3.0 + median(sentence_ids.into_iter()).unwrap();
                 // A double log is applied in order to smooth the difference between terms that occur
                 // with a large median difference.
-                cand.position = cand.position.ln().ln();
+                stats.position = stats.position.ln().ln();
             }
 
             {
                 // The higher the frequency of a candidate term, the greater its importance.
-                cand.frequency = cand.tf;
+                stats.frequency = stats.tf;
                 // To prevent a bias towards high frequency in long documents, we balance it.
                 // The mean and the standard deviation is calculated from non-stopwords terms,
                 // as stopwords usually have high frequencies.
-                cand.frequency /= mean_tf + std_tf;
+                stats.frequency /= mean_tf + std_tf;
             }
 
             {
                 if let Some((leftward, rightward)) = contexts.get(&u_term) {
                     let distinct: HashSet<_> = HashSet::from_iter(leftward.iter().map(Deref::deref));
-                    cand.dl = if leftward.is_empty() { 0. } else { distinct.len() as f64 / leftward.len() as f64 };
+                    stats.dl = if leftward.is_empty() { 0. } else { distinct.len() as f64 / leftward.len() as f64 };
 
                     let distinct: HashSet<_> = HashSet::from_iter(rightward.iter().map(Deref::deref));
-                    cand.dr = if rightward.is_empty() { 0. } else { distinct.len() as f64 / rightward.len() as f64 };
+                    stats.dr = if rightward.is_empty() { 0. } else { distinct.len() as f64 / rightward.len() as f64 };
                 }
 
-                cand.relatedness = 1.0 + (cand.dr + cand.dl) * (cand.tf / max_tf);
+                stats.relatedness = 1.0 + (stats.dr + stats.dl) * (stats.tf / max_tf);
             }
 
             {
                 // Candidates which appear in many different sentences have a higher probability
                 // of being important.
                 let distinct = occurrences.iter().map(|o| o.idx).collect::<HashSet<_>>();
-                cand.sentences = distinct.len() as f64 / sentences.len() as f64;
+                stats.sentences = distinct.len() as f64 / sentences.len() as f64;
             }
 
-            cand.score = (cand.relatedness * cand.position)
-                / (cand.casing + (cand.frequency / cand.relatedness) + (cand.sentences / cand.relatedness));
+            stats.score = (stats.relatedness * stats.position)
+                / (stats.casing + (stats.frequency / stats.relatedness) + (stats.sentences / stats.relatedness));
 
-            features.insert(lc_word, cand);
+            features.insert(lc_word, stats);
         }
 
         features
@@ -481,8 +481,8 @@ impl Yake {
                 let mut sum_ = 0.0;
 
                 for (j, (token, term_stop)) in tokens.iter().zip(u_terms).enumerate() {
-                    let Some(feat_cand) = features.get(token) else { continue };
-                    if feat_cand.is_stopword {
+                    let Some(stats) = features.get(token) else { continue };
+                    if stats.is_stopword {
                         let mut prob_t1 = 0.0;
                         let mut prob_t2 = 0.0;
                         if 1 < j {
@@ -502,8 +502,8 @@ impl Yake {
                         prod_ *= 1.0 + (1.0 - prob);
                         sum_ -= 1.0 - prob;
                     } else {
-                        prod_ *= feat_cand.score;
-                        sum_ += feat_cand.score;
+                        prod_ *= stats.score;
+                        sum_ += stats.score;
                     }
                 }
                 if sum_ == -1.0 {

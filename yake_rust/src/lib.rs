@@ -28,7 +28,6 @@ type LTerm = String;
 type UTerm = String;
 
 type Sentences = Vec<Sentence>;
-/// Key is `stems.join(" ")`
 type Candidates<'s> = IndexMap<&'s [LTerm], Candidate<'s>>;
 type Features<'s> = HashMap<&'s LTerm, TermStats>;
 type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
@@ -527,9 +526,9 @@ impl Yake {
             let lc_terms = v.lc_terms;
             let lc_words: HashSet<&LTerm> = HashSet::from_iter(lc_terms);
 
-            let has_float = || lc_words.iter().any(|w| w.parse::<f64>().is_ok());
+            let has_float = || lc_words.iter().any(|&w| self.is_d_tagged(w));
             let has_stop_word = || self.contains_stopword(&lc_words);
-            let is_punctuation = || lc_words.iter().any(|w| self.word_is_punctuation(w));
+            let has_unparsable = || lc_words.iter().any(|&w| self.is_u_tagged(w));
             let not_enough_symbols = || lc_words.iter().map(|w| w.chars().count()).sum::<usize>() < minimum_length;
             let has_too_short_word =
                 || lc_words.iter().map(|w| w.chars().count()).min().unwrap_or(0) < minimum_word_size;
@@ -539,7 +538,7 @@ impl Yake {
             // remove candidate if
             has_float()
                 || has_stop_word()
-                || is_punctuation()
+                || has_unparsable()
                 || not_enough_symbols()
                 || has_too_short_word()
                 || lc_terms.len() > maximum_word_number

@@ -1221,4 +1221,22 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn dataset_text_2_defaults() {
+        let text = include_str!("test_data_2.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(5));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected = [
+            ("highly radioactive water", "highly radioactive water", 0.0006),
+            ("crippled nuclear plant", "crippled nuclear plant", 0.0006),
+            ("ocean Japan official", "ocean japan official", 0.0031),
+            ("Japan official", "japan official", 0.0046),
+            ("official says highly", "official says highly", 0.0050),
+        ];
+
+        assert_eq!(actual, expected);
+    }
 }

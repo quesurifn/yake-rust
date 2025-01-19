@@ -1160,4 +1160,27 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn turkish_sample_defaults() {
+        let text = include_str!("test_tr.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("tr").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected = [
+            ("OECD", "oecd", 0.0176),                               // LIAAD REFERENCE: 0.0178
+            ("Tek Bakışta Eğitim", "tek bakışta eğitim", 0.0232),   // LIAAD REFERENCE: 0.0236
+            ("eğitim", "eğitim", 0.0274),                           // LIAAD REFERENCE: 0.0278
+            ("OECD eğitim endeksi", "oecd eğitim endeksi", 0.0313), // LIAAD REFERENCE: 0.0323
+            ("OECD ortalamasının", "oecd ortalamasının", 0.0375),   // LIAAD REFERNENCE: 0.0383
+            ("Kalkınma Örgütü'nün", "kalkınma örgütü'nün", 0.0449), // LIAAD REFERENCE: 0.045
+            ("Tek Bakışta", "tek bakışta", 0.0449),                 // LIAAD REFERENCE: 0.045
+            ("İşbirliği ve Kalkınma", "i̇şbirliği ve kalkınma", 0.0468),
+            ("Türkiye'de", "türkiye'de", 0.0476), // LIAAD REFERENCE: 0.0480
+            ("yüksek", "yüksek", 0.0509),         // LIAAD REFERENCE: 0.0513
+        ];
+
+        assert_eq!(actual, expected);
+    }
 }

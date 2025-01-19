@@ -1069,4 +1069,26 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    // #[test]
+    // fn portugese_sport_sample_defaults() {
+    //     let text = include_str!("test_pt_1.txt"); // LIAAD/yake sample text
+    //     let stopwords = StopWords::predefined("pt").unwrap();
+    //     let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+    //     // leave only 4 digits
+    //     actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+    //     let expected = [
+    //         ("seleção brasileira treinará", "seleção brasileira treinará", 0.0072),
+    //         ("seleção brasileira", "seleção brasileira", 0.0100),
+    //         ("Seleção Brasileira visando", "seleção brasileira visando", 0.0192),
+    //         ("Seleção Brasileira encara", "seleção brasileira encara", 0.0344),
+    //         ("brasileira treinará", "brasileira treinará", 0.0373),
+    //         ("Renato Augusto", "renato augusto", 0.0376),
+    //         ("Copa da Rússia", "copa da rússia", 0.0407),
+    //         ("seleção", "seleção", 0.0454),
+    //         ("brasileira", "brasileira", 0.0528),
+    //     ];
+
+    //     assert_eq!(actual, expected);
+    // }
 }

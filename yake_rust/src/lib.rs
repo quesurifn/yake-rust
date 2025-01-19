@@ -33,13 +33,6 @@ type Features<'s> = HashMap<&'s LString, YakeCandidate>;
 type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
 type Contexts<'s> = HashMap<&'s UTerm, (Vec<&'s UTerm>, Vec<&'s UTerm>)>;
 
-struct WeightedCandidates<'s> {
-    final_weights: IndexMap<&'s [LString], f64>,
-    _surface_to_lexical: HashMap<&'s [LString], &'s [LString]>,
-    _contexts: Contexts<'s>,
-    raw_lookup: HashMap<&'s [LString], &'s [RawString]>,
-}
-
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum Tag {
     Digit,
@@ -107,7 +100,7 @@ struct YakeCandidate {
     /// Term's different sentences heuristic
     sentences: f64,
     /// Importance score. The less, the better
-    weight: f64,
+    score: f64,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -126,13 +119,14 @@ struct Sentence {
     pub length: usize,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone)]
 struct PreCandidate<'s> {
     pub surfaces: Vec<&'s [String]>,
     pub lc_surfaces: Vec<&'s [LString]>,
     pub uq_terms: Vec<&'s [UTerm]>,
     pub offsets: Vec<usize>,
     pub sentence_ids: Vec<usize>,
+    pub score: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -189,15 +183,14 @@ impl Yake {
 
         let mut ngrams: Candidates = self.ngram_selection(self.config.ngrams, &sentences);
         self.filter_candidates(&mut ngrams, 3, 2, 5, false);
-        let weighted_candidates = self.candidate_weighting(features, context, ngrams);
+        Yake::candidate_weighting(features, &context, &mut ngrams);
 
-        let mut results = weighted_candidates
-            .final_weights
+        let mut results = ngrams
             .into_iter()
-            .map(|(keyword, score)| {
-                let raw = weighted_candidates.raw_lookup.get(&keyword).unwrap().join(" ");
-                let keyword = keyword.join(" ");
-                ResultItem { raw, keyword, score }
+            .map(|(_, candidate)| {
+                let raw = candidate.surfaces[0].join(" ");
+                let keyword = candidate.lc_surfaces[0].join(" ");
+                ResultItem { raw, keyword, score: candidate.score }
             })
             .collect::<Vec<_>>();
 
@@ -469,7 +462,7 @@ impl Yake {
                 cand.sentences = distinct.len() as f64 / sentences.len() as f64;
             }
 
-            cand.weight = (cand.relatedness * cand.position)
+            cand.score = (cand.relatedness * cand.position)
                 / (cand.casing + (cand.frequency / cand.relatedness) + (cand.sentences / cand.relatedness));
 
             features.insert(lc_word, cand);
@@ -478,17 +471,8 @@ impl Yake {
         features
     }
 
-    fn candidate_weighting<'s>(
-        &self,
-        features: Features<'s>,
-        contexts: Contexts<'s>,
-        candidates: Candidates<'s>,
-    ) -> WeightedCandidates<'s> {
-        let mut final_weights: IndexMap<&'s [String], f64> = IndexMap::new();
-        let mut _surface_to_lexical = HashMap::new();
-        let mut raw_lookup = HashMap::new();
-
-        for (_k, v) in candidates {
+    fn candidate_weighting<'s>(features: Features<'s>, contexts: &Contexts<'s>, candidates: &mut Candidates<'s>) {
+        for v in candidates.values_mut() {
             for (&candidate, &u_terms) in v.lc_surfaces.iter().zip(&v.uq_terms) {
                 let tokens = candidate;
                 let mut prod_ = 1.0;
@@ -516,8 +500,8 @@ impl Yake {
                         prod_ *= 1.0 + (1.0 - prob);
                         sum_ -= 1.0 - prob;
                     } else {
-                        prod_ *= feat_cand.weight;
-                        sum_ += feat_cand.weight;
+                        prod_ *= feat_cand.score;
+                        sum_ += feat_cand.score;
                     }
                 }
                 if sum_ == -1.0 {
@@ -525,15 +509,9 @@ impl Yake {
                 }
 
                 let tf = v.surfaces.len() as f64;
-                let weight = prod_ / (tf * (1.0 + sum_));
-
-                final_weights.insert(candidate, weight);
-                _surface_to_lexical.insert(candidate, *v.lc_surfaces.last().unwrap());
-                raw_lookup.insert(candidate, v.surfaces[0]);
+                v.score = prod_ / (tf * (1.0 + sum_));
             }
         }
-
-        WeightedCandidates { final_weights, _surface_to_lexical, _contexts: contexts, raw_lookup }
     }
 
     fn filter_candidates(

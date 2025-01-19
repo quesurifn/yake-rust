@@ -284,7 +284,7 @@ impl Yake {
         let mut contexts = Contexts::new();
 
         for sentence in sentences {
-            let mut window: VecDeque<&UTerm> = VecDeque::with_capacity(self.config.window_size + 1);
+            let mut window: VecDeque<(&String, &UTerm)> = VecDeque::with_capacity(self.config.window_size + 1);
 
             for ((word, term), &is_punctuation) in
                 sentence.words.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation)
@@ -294,21 +294,23 @@ impl Yake {
                     continue;
                 }
 
+                // Do not store in contexts in any way if the word (not the unique term) is tagged "d" or "u"
                 if !self.is_d_tagged(word) && !self.is_u_tagged(word) {
-                    for &left in window.iter() {
-                        if self.is_d_tagged(left) || self.is_u_tagged(left) {
+                    for &(left_word, left_uterm) in window.iter() {
+                        if self.is_d_tagged(left_word) || self.is_u_tagged(left_word) {
                             continue;
                         }
 
-                        contexts.entry(term).or_default().0.push(left); // term: [.., ->left]
-                        contexts.entry(left).or_default().1.push(term); // left: [.., ->term]
+                        // Context keys and elements are unique terms
+                        contexts.entry(term).or_default().0.push(left_uterm); // term: [.., ->left]
+                        contexts.entry(left_uterm).or_default().1.push(term); // left: [.., ->term]
                     }
                 }
 
                 if window.len() == self.config.window_size {
                     window.pop_front();
                 }
-                window.push_back(term);
+                window.push_back((word, term));
             }
         }
 
@@ -488,18 +490,22 @@ impl Yake {
                     if stats.is_stopword {
                         let mut prob_prev = 0.0;
                         let mut prob_succ = 0.0;
-                        if 1 < j {
+                        if 0 < j {
+                            // Not the first term
+                            // #previous term occuring before this one / #previous term
                             let prev_uq = uq_terms.get(j - 1).unwrap();
                             let prev_lc = lc_terms.get(j - 1).unwrap();
                             let prev_into_stopword =
                                 contexts.get(&prev_uq).unwrap().1.iter().filter(|&w| *w == uq).count();
                             prob_prev = prev_into_stopword as f64 / features.get(&prev_lc).unwrap().tf;
                         }
-                        if j + 1 < uq_terms.len() {
+                        if j < uq_terms.len() {
+                            // Not the last term
+                            // #next term occuring after this one / #next term
                             let next_uq = uq_terms.get(j + 1).unwrap();
                             let next_lc = lc_terms.get(j + 1).unwrap();
                             let stopword_into_next =
-                                contexts.get(&uq).unwrap().0.iter().filter(|&w| *w == next_uq).count();
+                                contexts.get(&uq).unwrap().1.iter().filter(|&w| *w == next_uq).count();
                             prob_succ = stopword_into_next as f64 / features.get(&next_lc).unwrap().tf;
                         }
 
@@ -838,14 +844,8 @@ mod tests {
             Yake::new(stopwords, Config { remove_duplicates: false, ..Config::default() }).get_n_best(text, Some(1));
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
-        let expected = [("Thrones", "thrones", 0.086)];
-
-        // LIAAD REFERENCE:
-        // "Game of Thrones" 0.01380
-
-        // REASONS FOR DISCREPANCY:
-        // - yake-rust drops "Game of Thrones" because it contains a stopword (filter_candidates)
-        //   but LIAAD/yake correctly only cares about stopwords in the leading and trailing words.
+        let expected = [("Game of Thrones", "game of thrones", 0.01380)];
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }
@@ -992,10 +992,10 @@ mod tests {
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected = [
+            ("Vincent van Gogh", "vincent van gogh", 0.0111),
             ("Gogh Museum", "gogh museum", 0.0125),
             ("Gogh", "gogh", 0.0150),
             ("Museum", "museum", 0.0438),
-            ("Vincent van Gogh", "vincent van gogh", 0.063), // LIAAD: 0.0111
             ("brieven", "brieven", 0.0635),
             ("Vincent", "vincent", 0.0643),
             ("Goghs schilderijen", "goghs schilderijen", 0.1009),
@@ -1003,13 +1003,7 @@ mod tests {
             ("Goghs", "goghs", 0.1651),
             ("schrijven", "schrijven", 0.1704),
         ];
-
-        // REASONS FOR DISCREPANCY:
-        // - For both implementations, "van" is a stopword. Most likely, filter_candidates
-        //   removes "Vincent van Gogh" because it contains a stopword. The corresponding logic
-        //   of filtering in LIAAD/yake is "none of the consituent words may be tagged 'u' or 'd'
-        //   and the first and last terms must not be stopwords". There are no digits or punctuation
-        //   symbols, so there are no 'u' or 'd' tags, and neither "Vincent" nor "Gogh" are stopwords.
+        // Results agree with reference implementation LIAAD/yake
 
         assert_eq!(actual, expected);
     }

@@ -1026,4 +1026,23 @@ mod tests {
 
     //     assert_eq!(actual, expected);
     // }
+
+    #[test]
+    fn italian_sample_defaults() {
+        let text = include_str!("test_it.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("it").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(5));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected = [
+            ("Champions League", "champions league", 0.0390),
+            ("Quarti", "quarti", 0.0520),
+            ("Atlético Madrid", "atlético madrid", 0.0592),
+            ("Ottavi di finale", "ottavi di finale", 0.0646),
+            ("Real Madrid", "real madrid", 0.0701),
+        ];
+        // Results agree with reference implementation LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
 }

@@ -1244,4 +1244,23 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn dataset_text_3_defaults() {
+        let text = include_str!("test_data_3.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(5));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected = [
+            ("Global Crossing", "global crossing", 0.0034),
+            ("Hutchison Telecommunications", "hutchison telecommunications", 0.0053),
+            ("Telecommunications and Singapore", "telecommunications and singapore", 0.0072),
+            ("Singapore Technologies", "singapore technologies", 0.0072),
+            ("Technologies take control", "technologies take control", 0.0157),
+        ];
+        // Results agree with reference implementation LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
 }

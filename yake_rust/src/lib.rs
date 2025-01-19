@@ -1334,4 +1334,27 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    // #[test]
+    // fn dataset_text_7_defaults() {
+    //     let text = include_str!("test_data_7.txt"); // LIAAD/yake sample text
+    //     let stopwords = StopWords::predefined("en").unwrap();
+    //     let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+    //     // leave only 4 digits
+    //     actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+    //     let expected = [
+    //         ("Environment Design Level", "environment design level", 0.0008),
+    //         ("Jerusalem Jerusalem", "jerusalem jerusalem", 0.0009),
+    //         ("Dynamics Based Control", "dynamics based control", 0.0011),
+    //         ("system dynamics", "system dynamics", 0.0017),
+    //         ("DBC", "dbc", 0.0019),
+    //         ("target system dynamics", "target system dynamics", 0.0019),
+    //         ("target dynamics", "target dynamics", 0.0023),
+    //         ("Science Bar Ilan", "science bar ilan", 0.0025),
+    //         ("EMT", "emt", 0.0026),
+    //         ("Dynamics", "dynamics", 0.0026),
+    //     ];
+
+    //     assert_eq!(actual, expected);
+    // }
 }

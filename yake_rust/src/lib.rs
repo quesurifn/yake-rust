@@ -124,8 +124,6 @@ struct PreCandidate<'s> {
     pub surfaces: Vec<&'s [String]>,
     pub lc_terms: &'s [LString],
     pub uq_terms: &'s [UTerm],
-    pub offsets: Vec<usize>,
-    pub sentence_ids: Vec<usize>,
     pub score: f64,
 }
 
@@ -568,8 +566,6 @@ impl Yake {
                     candidate.surfaces.push(&sentence.words[j..k]);
                     candidate.lc_terms = lc_words;
                     candidate.uq_terms = &sentence.uq_terms[j..k];
-                    candidate.sentence_ids.push(idx);
-                    candidate.offsets.push(j + shift);
                 }
             }
         }

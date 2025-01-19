@@ -471,33 +471,32 @@ impl Yake {
     }
 
     fn candidate_weighting<'s>(features: Features<'s>, contexts: &Contexts<'s>, candidates: &mut Candidates<'s>) {
-        for v in candidates.values_mut() {
-            let candidate = v.lc_terms;
-            let u_terms = v.uq_terms;
+        for candidate in candidates.values_mut() {
+            let lc_terms = candidate.lc_terms;
+            let uq_terms = candidate.uq_terms;
             {
-                let tokens = candidate;
                 let mut prod_ = 1.0;
                 let mut sum_ = 0.0;
 
-                for (j, (token, term_stop)) in tokens.iter().zip(u_terms).enumerate() {
-                    let Some(stats) = features.get(token) else { continue };
+                for (j, (lc, uq)) in lc_terms.iter().zip(uq_terms).enumerate() {
+                    let Some(stats) = features.get(lc) else { continue };
                     if stats.is_stopword {
-                        let mut prob_t1 = 0.0;
-                        let mut prob_t2 = 0.0;
+                        let mut prob_prev = 0.0;
+                        let mut prob_succ = 0.0;
                         if 1 < j {
-                            let term_left = u_terms.get(j - 1).unwrap();
-                            prob_t1 = contexts.get(&term_left).unwrap().1.iter().filter(|w| **w == term_stop).count()
-                                as f64
-                                / features.get(&term_left).unwrap().tf;
+                            let prev_uq = uq_terms.get(j - 1).unwrap();
+                            let prev_into_stopword =
+                                contexts.get(&prev_uq).unwrap().1.iter().filter(|&w| *w == uq).count();
+                            prob_prev = prev_into_stopword as f64 / features.get(&prev_uq).unwrap().tf;
                         }
-                        if j + 1 < tokens.len() {
-                            let term_right = u_terms.get(j + 1).unwrap();
-                            prob_t2 = contexts.get(&term_stop).unwrap().0.iter().filter(|w| **w == term_right).count()
-                                as f64
-                                / features.get(&term_right).unwrap().tf;
+                        if j + 1 < uq_terms.len() {
+                            let next_uq = uq_terms.get(j + 1).unwrap();
+                            let stopword_into_next =
+                                contexts.get(&uq).unwrap().0.iter().filter(|&w| *w == next_uq).count();
+                            prob_succ = stopword_into_next as f64 / features.get(&next_uq).unwrap().tf;
                         }
 
-                        let prob = prob_t1 * prob_t2;
+                        let prob = prob_prev * prob_succ;
                         prod_ *= 1.0 + (1.0 - prob);
                         sum_ -= 1.0 - prob;
                     } else {
@@ -509,8 +508,8 @@ impl Yake {
                     sum_ = 0.999999999;
                 }
 
-                let tf = v.occurrences.len() as f64;
-                v.score = prod_ / (tf * (1.0 + sum_));
+                let tf = candidate.occurrences.len() as f64;
+                candidate.score = prod_ / (tf * (1.0 + sum_));
             }
         }
     }

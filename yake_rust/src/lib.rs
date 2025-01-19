@@ -1137,4 +1137,27 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn polish_sample_defaults() {
+        let text = include_str!("test_pl.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("pl").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected = [
+            ("franka", "franka", 0.0328),
+            ("Geerta Wildersa VVD", "geerta wildersa vvd", 0.0346),
+            ("Geerta Wildersa", "geerta wildersa", 0.0399),
+            ("kurs franka", "kurs franka", 0.0486),
+            ("partii Geerta Wildersa", "partii geerta wildersa", 0.0675),
+            ("proc", "proc", 0.0692),
+            ("mld", "mld", 0.0724),
+            ("Narodowego Banku Szwajcarii", "narodowego banku szwajcarii", 0.0728),
+            ("kurs franka poniżej", "kurs franka poniżej", 0.0758),
+            ("Wildersa", "wildersa", 0.0765),
+        ];
+
+        assert_eq!(actual, expected);
+    }
 }

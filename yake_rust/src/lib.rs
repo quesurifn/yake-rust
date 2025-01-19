@@ -1045,4 +1045,28 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn french_sample_defaults() {
+        let text = include_str!("test_fr.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("fr").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected = [
+            ("dégrade en France", "dégrade en france", 0.0254),
+            ("jusque-là uniquement associée", "jusque-là uniquement associée", 0.0504),
+            ("sondage Ifop réalisé", "sondage ifop réalisé", 0.0554),
+            ("religion se dégrade", "religion se dégrade", 0.091),
+            ("France", "france", 0.0941),
+            ("l'extrême droite", "l'extrême droite", 0.0997),
+            ("sondage Ifop", "sondage ifop", 0.101),
+            ("Islam", "islam", 0.1021),
+            ("musulmane en France", "musulmane en france", 0.1078),
+            ("Allemagne", "allemagne", 0.1086),
+        ];
+        // Results agree with reference implementation LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
 }

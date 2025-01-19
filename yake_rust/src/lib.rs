@@ -1003,4 +1003,27 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    // #[test]
+    // fn finnish_sample_defaults() {
+    //     let text = include_str!("test_fi.txt"); // LIAAD/yake sample text
+    //     let stopwords = StopWords::predefined("fi").unwrap();
+    //     let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+    //     // leave only 4 digits
+    //     actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+    //     let expected = [
+    //         ("Mobile Networks", "mobile networks", 0.0043),
+    //         ("Nokia tekee muutoksia", "nokia tekee muutoksia", 0.0061),
+    //         ("tekee muutoksia organisaatioonsa", "tekee muutoksia organisaatioonsa", 0.0065),
+    //         ("johtokuntaansa vauhdittaakseen yhtiön", "johtokuntaansa vauhdittaakseen yhtiön", 0.0088),
+    //         ("vauhdittaakseen yhtiön strategian", "vauhdittaakseen yhtiön strategian", 0.0088),
+    //         ("yhtiön strategian toteuttamista", "yhtiön strategian toteuttamista", 0.0092),
+    //         ("Networks", "networks", 0.0102),
+    //         ("Networks and Applications", "networks and applications", 0.0113),
+    //         ("strategian toteuttamista Nokia", "strategian toteuttamista nokia", 0.0127),
+    //         ("siirtyy Mobile Networks", "siirtyy mobile networks", 0.0130),
+    //     ];
+
+    //     assert_eq!(actual, expected);
+    // }
 }

@@ -186,7 +186,7 @@ impl Yake {
         let features = self.extract_features(&context, vocabulary, &sentences);
 
         let mut ngrams: Candidates = self.ngram_selection(self.config.ngrams, &sentences);
-        self.filter_candidates(&mut ngrams, 3, 2, false);
+        self.filter_candidates(&mut ngrams, 3, false);
         Yake::candidate_weighting(features, &context, &mut ngrams);
 
         let mut results = ngrams
@@ -531,7 +531,6 @@ impl Yake {
         &self,
         candidates: &mut Candidates,
         minimum_length: usize,
-        minimum_word_size: usize,
         only_alphanumeric_and_hyphen: bool, // could be a function
     ) {
         // fixme: filter right before inserting into the set to optimize
@@ -543,18 +542,11 @@ impl Yake {
             let has_stop_word = || self.is_stopword(&lc_terms[0]) || self.is_stopword(lc_terms.last().unwrap());
             let has_unparsable = || lc_words.iter().any(|&w| self.is_u_tagged(w));
             let not_enough_symbols = || lc_words.iter().map(|w| w.chars().count()).sum::<usize>() < minimum_length;
-            let has_too_short_word =
-                || lc_words.iter().map(|w| w.chars().count()).min().unwrap_or(0) < minimum_word_size;
             let has_non_alphanumeric =
                 || only_alphanumeric_and_hyphen && !lc_words.iter().all(word_is_alphanumeric_and_hyphen);
 
             // remove candidate if
-            has_float()
-                || has_stop_word()
-                || has_unparsable()
-                || not_enough_symbols()
-                || has_too_short_word()
-                || has_non_alphanumeric()
+            has_float() || has_stop_word() || has_unparsable() || not_enough_symbols() || has_non_alphanumeric()
         });
     }
 
@@ -1202,6 +1194,29 @@ mod tests {
             ("مرآة النقد", "مرآة النقد", 0.0255), // LIAAD REFERENCE: 0.025
             ("اللغة العربية بدمشق", "اللغة العربية بدمشق", 0.0261),
             ("مجمع اللغة العربية", "مجمع اللغة العربية", 0.0281),
+        ];
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn dataset_text_1_defaults() {
+        let text = include_str!("test_data_1.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("pt").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected = [
+            ("Médio Oriente continua", "médio oriente continua", 0.0008),
+            ("Médio Oriente", "médio oriente", 0.0045),
+            ("Oriente continua", "oriente continua", 0.0117),
+            ("registar-se violentos confrontos", "registar-se violentos confrontos", 0.0178),
+            ("Faixa de Gaza", "faixa de gaza", 0.0268),
+            ("fogo hoje voltaram", "fogo hoje voltaram", 0.0311),
+            ("voltaram a registar-se", "voltaram a registar-se", 0.0311),
+            ("registar-se violentos", "registar-se violentos", 0.0311),
+            ("Exército israelita", "exército israelita", 0.0368),
+            ("Exército israelita voltou", "exército israelita voltou", 0.0639),
         ];
 
         assert_eq!(actual, expected);

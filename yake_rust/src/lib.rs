@@ -186,7 +186,7 @@ impl Yake {
         let features = self.extract_features(&context, vocabulary, &sentences);
 
         let mut ngrams: Candidates = self.ngram_selection(self.config.ngrams, &sentences);
-        self.filter_candidates(&mut ngrams, 3, 2, 5, false);
+        self.filter_candidates(&mut ngrams, 3, 2, false);
         Yake::candidate_weighting(features, &context, &mut ngrams);
 
         let mut results = ngrams
@@ -532,7 +532,6 @@ impl Yake {
         candidates: &mut Candidates,
         minimum_length: usize,
         minimum_word_size: usize,
-        maximum_word_number: usize,
         only_alphanumeric_and_hyphen: bool, // could be a function
     ) {
         // fixme: filter right before inserting into the set to optimize
@@ -555,7 +554,6 @@ impl Yake {
                 || has_unparsable()
                 || not_enough_symbols()
                 || has_too_short_word()
-                || lc_terms.len() > maximum_word_number
                 || has_non_alphanumeric()
         });
     }

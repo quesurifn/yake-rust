@@ -526,10 +526,8 @@ impl Yake {
     ) {
         // fixme: filter right before inserting into the set to optimize
         candidates.retain(|_k, v| !{
-            // get the words from the first occurring surface form
-            let first_lc_surface = v.lc_terms;
-            let last_lc_surface = v.lc_terms;
-            let lc_words: HashSet<&LString> = HashSet::from_iter(first_lc_surface);
+            let lc_terms = v.lc_terms;
+            let lc_words: HashSet<&LString> = HashSet::from_iter(lc_terms);
 
             let has_float = || lc_words.iter().any(|w| w.parse::<f64>().is_ok());
             let has_stop_word = || self.contains_stopword(&lc_words);
@@ -546,10 +544,10 @@ impl Yake {
                 || is_punctuation()
                 || not_enough_symbols()
                 || has_too_short_word()
-                || last_lc_surface.len() > maximum_word_number
+                || lc_terms.len() > maximum_word_number
                 || has_non_alphanumeric()
-                || first_lc_surface[0].len() < 3 // fixme: magic constant
-                || first_lc_surface.last().unwrap().len() < 3
+                || lc_terms[0].len() < 3 // fixme: magic constant
+                || lc_terms.last().unwrap().len() < 3
         });
     }
 

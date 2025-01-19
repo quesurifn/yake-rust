@@ -1310,4 +1310,28 @@ mod tests {
 
     //     assert_eq!(actual, expected);
     // }
+
+    #[test]
+    fn dataset_text_6_defaults() {
+        let text = include_str!("test_data_6.txt"); // LIAAD/yake sample text
+        let stopwords = StopWords::predefined("en").unwrap();
+        let mut actual = Yake::new(stopwords, Config::default()).get_n_best(text, Some(10));
+        // leave only 4 digits
+        actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
+        let expected = [
+            ("MRSA", "mrsa", 0.0047),
+            ("TSN Database", "tsn database", 0.0107),
+            ("methicillin-resistant Staphylococcus aureus", "methicillin-resistant staphylococcus aureus", 0.0116),
+            ("rates of MRSA", "rates of mrsa", 0.0145),
+            ("Staphylococcus aureus", "staphylococcus aureus", 0.0167),
+            ("methicillin-resistant Staphylococcus", "methicillin-resistant staphylococcus", 0.0177),
+            ("prevalence of MRSA", "prevalence of mrsa", 0.0201),
+            ("MRSA infections", "mrsa infections", 0.0218),
+            ("MRSA infections detected", "mrsa infections detected", 0.0223),
+            ("TSN", "tsn", 0.0250),
+        ];
+        // Results agree with reference implementation LIAAD/yake
+
+        assert_eq!(actual, expected);
+    }
 }

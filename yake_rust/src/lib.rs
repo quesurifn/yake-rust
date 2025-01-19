@@ -484,15 +484,17 @@ impl Yake {
                         let mut prob_succ = 0.0;
                         if 1 < j {
                             let prev_uq = uq_terms.get(j - 1).unwrap();
+                            let prev_lc = lc_terms.get(j - 1).unwrap();
                             let prev_into_stopword =
                                 contexts.get(&prev_uq).unwrap().1.iter().filter(|&w| *w == uq).count();
-                            prob_prev = prev_into_stopword as f64 / features.get(&prev_uq).unwrap().tf;
+                            prob_prev = prev_into_stopword as f64 / features.get(&prev_lc).unwrap().tf;
                         }
                         if j + 1 < uq_terms.len() {
                             let next_uq = uq_terms.get(j + 1).unwrap();
+                            let next_lc = lc_terms.get(j + 1).unwrap();
                             let stopword_into_next =
                                 contexts.get(&uq).unwrap().0.iter().filter(|&w| *w == next_uq).count();
-                            prob_succ = stopword_into_next as f64 / features.get(&next_uq).unwrap().tf;
+                            prob_succ = stopword_into_next as f64 / features.get(&next_lc).unwrap().tf;
                         }
 
                         let prob = prob_prev * prob_succ;
@@ -527,7 +529,7 @@ impl Yake {
             let lc_words: HashSet<&LTerm> = HashSet::from_iter(lc_terms);
 
             let has_float = || lc_words.iter().any(|&w| self.is_d_tagged(w));
-            let has_stop_word = || self.contains_stopword(&lc_words);
+            let has_stop_word = || self.is_stopword(&lc_terms[0]) || self.is_stopword(lc_terms.last().unwrap());
             let has_unparsable = || lc_words.iter().any(|&w| self.is_u_tagged(w));
             let not_enough_symbols = || lc_words.iter().map(|w| w.chars().count()).sum::<usize>() < minimum_length;
             let has_too_short_word =
@@ -1044,17 +1046,16 @@ mod tests {
         // leave only 4 digits
         actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);
         let expected: Results = vec![
-            // LIAAD REFERENCE: Missing: ResultItem { raw: "Vincent van Gogh".into(), keyword: "vincent van gogh".into(), score: 0.0111 },
             ResultItem { raw: "Gogh Museum".into(), keyword: "gogh museum".into(), score: 0.0125 },
             ResultItem { raw: "Gogh".into(), keyword: "gogh".into(), score: 0.0150 },
             ResultItem { raw: "Museum".into(), keyword: "museum".into(), score: 0.0438 },
+            ResultItem { raw: "Vincent van Gogh".into(), keyword: "vincent van gogh".into(), score: 0.063 }, // LIAAD: 0.0111
             ResultItem { raw: "brieven".into(), keyword: "brieven".into(), score: 0.0635 },
             ResultItem { raw: "Vincent".into(), keyword: "vincent".into(), score: 0.0643 },
             ResultItem { raw: "Goghs schilderijen".into(), keyword: "goghs schilderijen".into(), score: 0.1009 },
             ResultItem { raw: "Gogh verging".into(), keyword: "gogh verging".into(), score: 0.1215 },
             ResultItem { raw: "Goghs".into(), keyword: "goghs".into(), score: 0.1651 },
             ResultItem { raw: "schrijven".into(), keyword: "schrijven".into(), score: 0.1704 },
-            ResultItem { raw: "Amsterdam".into(), keyword: "amsterdam".into(), score: 0.1813 }, // Same as LIAAD/yake, but #11
         ];
 
         // REASONS FOR DISCREPANCY:

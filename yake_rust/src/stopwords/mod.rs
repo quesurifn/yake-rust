@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 
-use crate::LString;
+use crate::LTerm;
 
 /// List of lowercased words to be filtered out from the text.
 ///
@@ -9,12 +9,12 @@ use crate::LString;
 /// given as input. Tokens with fewer than three characters are also considered a stopword.
 #[derive(Debug, Default, Clone)]
 pub struct StopWords {
-    set: HashSet<LString>,
+    set: HashSet<LTerm>,
 }
 
 impl StopWords {
     /// Use the passed set of lowercased strings as stopwords.
-    pub fn custom(lowercased: HashSet<LString>) -> Self {
+    pub fn custom(lowercased: HashSet<LTerm>) -> Self {
         StopWords { set: lowercased }
     }
 
@@ -108,7 +108,7 @@ impl StopWords {
 }
 
 impl Deref for StopWords {
-    type Target = HashSet<LString>;
+    type Target = HashSet<LTerm>;
 
     fn deref(&self) -> &Self::Target {
         &self.set

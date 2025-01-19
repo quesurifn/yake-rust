@@ -22,15 +22,15 @@ mod stopwords;
 type RawString = String;
 
 /// Lowercased string
-type LString = String;
+type LTerm = String;
 
 /// Lowercased string without punctuation symbols in single form
 type UTerm = String;
 
 type Sentences = Vec<Sentence>;
 /// Key is `stems.join(" ")`
-type Candidates<'s> = IndexMap<&'s [LString], Candidate<'s>>;
-type Features<'s> = HashMap<&'s LString, TermStats>;
+type Candidates<'s> = IndexMap<&'s [LTerm], Candidate<'s>>;
+type Features<'s> = HashMap<&'s LTerm, TermStats>;
 type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
 type Contexts<'s> = HashMap<&'s UTerm, (Vec<&'s UTerm>, Vec<&'s UTerm>)>;
 
@@ -107,7 +107,7 @@ struct TermStats {
 #[derive(PartialEq, Clone, Debug)]
 pub struct ResultItem {
     pub raw: String,
-    pub keyword: LString,
+    pub keyword: LTerm,
     pub score: f64,
 }
 
@@ -115,7 +115,7 @@ pub struct ResultItem {
 struct Sentence {
     pub words: Vec<RawString>,
     pub is_punctuation: Vec<bool>,
-    pub lc_words: Vec<LString>,
+    pub lc_terms: Vec<LTerm>,
     pub uq_terms: Vec<UTerm>,
 }
 
@@ -123,7 +123,7 @@ struct Sentence {
 #[derive(Debug, Default, Clone)]
 struct Candidate<'s> {
     pub occurrences: Vec<&'s [RawString]>,
-    pub lc_terms: &'s [LString],
+    pub lc_terms: &'s [LTerm],
     pub uq_terms: &'s [UTerm],
     pub score: f64,
 }
@@ -208,15 +208,15 @@ impl Yake {
         word.to_single().to_lowercase()
     }
 
-    fn is_stopword(&self, lc_word: &LString) -> bool {
+    fn is_stopword(&self, lc_term: &LTerm) -> bool {
         // todo: optimize by iterating the smallest set or with a trie
-        self.stop_words.contains(lc_word)
-            || self.stop_words.contains(lc_word.to_single())
+        self.stop_words.contains(lc_term)
+            || self.stop_words.contains(lc_term.to_single())
             // having less than 3 non-punctuation symbols is typical for stop words
-            || lc_word.to_single().chars().filter(|ch| !self.config.punctuation.contains(ch)).count() < 3
+            || lc_term.to_single().chars().filter(|ch| !self.config.punctuation.contains(ch)).count() < 3
     }
 
-    pub fn contains_stopword(&self, words: &HashSet<&LString>) -> bool {
+    pub fn contains_stopword(&self, words: &HashSet<&LTerm>) -> bool {
         words.iter().any(|w| self.is_stopword(w))
     }
 
@@ -245,10 +245,10 @@ impl Yake {
             .into_iter()
             .map(|sentence| {
                 let words = split_into_words(&sentence);
-                let lc_words = words.iter().map(|w| w.to_lowercase()).collect::<Vec<LString>>();
+                let lc_words = words.iter().map(|w| w.to_lowercase()).collect::<Vec<LTerm>>();
                 let uq_terms = lc_words.iter().map(|w| self.get_unique_term(w)).collect();
                 let is_punctuation = words.iter().map(|w| self.word_is_punctuation(w)).collect();
-                Sentence { words, lc_words, uq_terms, is_punctuation }
+                Sentence { words, lc_terms: lc_words, uq_terms, is_punctuation }
             })
             .collect()
     }
@@ -353,8 +353,8 @@ impl Yake {
 
         let words_nsw: HashMap<&UTerm, usize> = sentences
             .iter()
-            .flat_map(|sentence| sentence.lc_words.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation))
-            .filter(|&((lc_word, _), is_punct)| !is_punct && !self.is_stopword(lc_word))
+            .flat_map(|sentence| sentence.lc_terms.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation))
+            .filter(|&((lc_term, _), is_punct)| !is_punct && !self.is_stopword(lc_term))
             .map(|((_, u_term), _)| {
                 let occurrences = words.get(u_term).unwrap().len();
                 (u_term, occurrences)
@@ -370,16 +370,16 @@ impl Yake {
 
         let candidate_words: IndexSet<_> = sentences
             .iter()
-            .flat_map(|sentence| sentence.lc_words.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation))
+            .flat_map(|sentence| sentence.lc_terms.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation))
             .filter(|&(_, is_punct)| !is_punct)
             .map(|(pair, _)| pair)
             .collect();
 
-        for (lc_word, u_term) in candidate_words {
+        for (lc_term, u_term) in candidate_words {
             let occurrences = words.get(u_term).unwrap();
 
             let mut stats = TermStats {
-                is_stopword: self.is_stopword(lc_word),
+                is_stopword: self.is_stopword(lc_term),
                 tf: occurrences.len() as f64,
                 ..Default::default()
             };
@@ -464,7 +464,7 @@ impl Yake {
             stats.score = (stats.relatedness * stats.position)
                 / (stats.casing + (stats.frequency / stats.relatedness) + (stats.sentences / stats.relatedness));
 
-            features.insert(lc_word, stats);
+            features.insert(lc_term, stats);
         }
 
         features
@@ -525,7 +525,7 @@ impl Yake {
         // fixme: filter right before inserting into the set to optimize
         candidates.retain(|_k, v| !{
             let lc_terms = v.lc_terms;
-            let lc_words: HashSet<&LString> = HashSet::from_iter(lc_terms);
+            let lc_words: HashSet<&LTerm> = HashSet::from_iter(lc_terms);
 
             let has_float = || lc_words.iter().any(|w| w.parse::<f64>().is_ok());
             let has_stop_word = || self.contains_stopword(&lc_words);
@@ -559,7 +559,7 @@ impl Yake {
                         continue;
                     }
 
-                    let lc_words = &sentence.lc_words[j..k];
+                    let lc_words = &sentence.lc_terms[j..k];
                     let candidate = candidates.entry(lc_words).or_default();
 
                     candidate.occurrences.push(&sentence.words[j..k]);

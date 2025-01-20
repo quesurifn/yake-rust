@@ -1312,6 +1312,9 @@ mod tests {
             ("traditional handoff scheme", "traditional handoff scheme", 0.0033),
         ];
 
+        // REASONS FOR DISCREPANCY:
+        // - Difference in sentence splitting.
+
         assert_eq!(actual, expected);
     }
 

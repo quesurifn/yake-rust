@@ -299,9 +299,9 @@ checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 
 [[package]]
 name = "segtok"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8714555be1801879348755f63188ea8cc760c5f673fbecfb4eb66b54e5b31b9"
+checksum = "5638c87337e52f97be8453f096ebe94d346057e717da98c3eb9911d9078b48e9"
 dependencies = [
  "fancy-regex",
  "htmlize",

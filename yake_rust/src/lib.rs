@@ -149,6 +149,11 @@ pub struct Config {
     ///
     /// The [original implementation](https://github.com/LIAAD/) sticks with `true`.
     pub strict_capital: bool,
+
+    /// When `true`, key phrases are allowed to have only alphanumeric characters and hyphen.
+    pub only_alphanumeric_and_hyphen: bool,
+    /// Key phrases can't be too short, less than `minimum_chars` in total.
+    pub minimum_chars: usize,
 }
 
 impl Default for Config {
@@ -160,6 +165,8 @@ impl Default for Config {
             ngrams: 3,
             remove_duplicates: true,
             strict_capital: true,
+            only_alphanumeric_and_hyphen: false,
+            minimum_chars: 3,
         }
     }
 }
@@ -514,15 +521,16 @@ impl Yake {
         }
     }
 
-    fn is_candidate(&self, lc_terms: &[LTerm], minimum_length: usize, only_alphanumeric_and_hyphen: bool) -> bool {
+    fn is_candidate(&self, lc_terms: &[LTerm]) -> bool {
         let lc_words: HashSet<&LTerm> = HashSet::from_iter(lc_terms);
 
         let has_float = || lc_words.iter().any(|&w| self.is_d_tagged(w));
         let has_stop_word = || self.is_stopword(&lc_terms[0]) || self.is_stopword(lc_terms.last().unwrap());
         let has_unparsable = || lc_words.iter().any(|&w| self.is_u_tagged(w));
-        let not_enough_symbols = || lc_words.iter().map(|w| w.chars().count()).sum::<usize>() < minimum_length;
+        let not_enough_symbols =
+            || lc_terms.iter().map(|w| w.chars().count()).sum::<usize>() < self.config.minimum_chars;
         let has_non_alphanumeric =
-            || only_alphanumeric_and_hyphen && !lc_words.iter().all(word_is_alphanumeric_and_hyphen);
+            || self.config.only_alphanumeric_and_hyphen && !lc_words.iter().all(word_is_alphanumeric_and_hyphen);
 
         !{ has_float() || has_stop_word() || has_unparsable() || not_enough_symbols() || has_non_alphanumeric() }
     }
@@ -545,7 +553,7 @@ impl Yake {
                     if ignored.contains(lc_terms) {
                         continue;
                     }
-                    if !self.is_candidate(lc_terms, 3, false) {
+                    if !self.is_candidate(lc_terms) {
                         ignored.insert(lc_terms);
                         continue;
                     }

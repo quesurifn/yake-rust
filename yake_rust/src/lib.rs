@@ -9,10 +9,11 @@ use plural_helper::PluralHelper;
 use preprocessor::{split_into_sentences, split_into_words};
 use stats::{mean, median, stddev};
 
-use crate::counter::Counter;
+use crate::context::Contexts;
 use crate::levenshtein::levenshtein_ratio;
 pub use crate::stopwords::StopWords;
 
+mod context;
 mod counter;
 mod levenshtein;
 mod plural_helper;
@@ -32,7 +33,6 @@ type Sentences = Vec<Sentence>;
 type Candidates<'s> = IndexMap<&'s [LTerm], Candidate<'s>>;
 type Features<'s> = HashMap<&'s LTerm, TermStats>;
 type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
-type Contexts<'s> = HashMap<&'s UTerm, (Counter<&'s UTerm>, Counter<&'s UTerm>)>;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum Tag {
@@ -92,10 +92,6 @@ struct TermStats {
     position: f64,
     /// Normalized term frequency heuristic
     frequency: f64,
-    /// Left dispersion
-    dl: f64,
-    /// Right dispersion
-    dr: f64,
     /// Term relatedness to context
     relatedness: f64,
     /// Term's different sentences heuristic
@@ -282,7 +278,7 @@ impl Yake {
     /// a given term and its predecessor AND a given term and its subsequent term,
     /// found within a window of a given size.
     fn build_context<'s>(&self, sentences: &'s [Sentence]) -> Contexts<'s> {
-        let mut contexts = Contexts::default();
+        let mut ctx = Contexts::default();
 
         for sentence in sentences {
             let mut window: VecDeque<(&String, &UTerm)> = VecDeque::with_capacity(self.config.window_size + 1);
@@ -302,8 +298,7 @@ impl Yake {
                             continue;
                         }
 
-                        contexts.entry(term).or_default().0.inc(left_uterm); // term: [.., ->left]
-                        contexts.entry(left_uterm).or_default().1.inc(term); // left: [.., ->term]
+                        ctx.track(left_uterm, term);
                     }
                 }
 
@@ -314,7 +309,7 @@ impl Yake {
             }
         }
 
-        contexts
+        ctx
     }
 
     fn is_d_tagged(&self, word: &str) -> bool {
@@ -355,7 +350,7 @@ impl Yake {
 
     /// Computes local statistic features that extract informative content within the text
     /// to calculate the importance of single terms.
-    fn extract_features<'s>(&self, contexts: &Contexts, words: Words<'s>, sentences: &'s Sentences) -> Features<'s> {
+    fn extract_features<'s>(&self, ctx: &Contexts, words: Words<'s>, sentences: &'s Sentences) -> Features<'s> {
         let tf = words.values().map(Vec::len);
 
         let words_nsw: HashMap<&UTerm, usize> = sentences
@@ -450,14 +445,8 @@ impl Yake {
             }
 
             {
-                if let Some((leftward, rightward)) = contexts.get(&u_term) {
-                    stats.dl =
-                        if leftward.is_empty() { 0. } else { leftward.distinct() as f64 / leftward.total() as f64 };
-                    stats.dr =
-                        if rightward.is_empty() { 0. } else { rightward.distinct() as f64 / rightward.total() as f64 };
-                }
-
-                stats.relatedness = 1.0 + (stats.dr + stats.dl) * (stats.tf / max_tf);
+                let (dl, dr) = ctx.dispersion_of(u_term);
+                stats.relatedness = 1.0 + (dr + dl) * (stats.tf / max_tf);
             }
 
             {
@@ -476,7 +465,7 @@ impl Yake {
         features
     }
 
-    fn candidate_weighting<'s>(features: Features<'s>, contexts: &Contexts<'s>, candidates: &mut Candidates<'s>) {
+    fn candidate_weighting<'s>(features: Features<'s>, ctx: &Contexts<'s>, candidates: &mut Candidates<'s>) {
         for candidate in candidates.values_mut() {
             let lc_terms = candidate.lc_terms;
             let uq_terms = candidate.uq_terms;
@@ -491,19 +480,21 @@ impl Yake {
                         let mut prob_succ = 0.0;
                         if 0 < j {
                             // Not the first term
-                            // #previous term occuring before this one / #previous term
+                            // #previous term occurring before this one / #previous term
                             let prev_uq = uq_terms.get(j - 1).unwrap();
                             let prev_lc = lc_terms.get(j - 1).unwrap();
-                            let prev_into_stopword = contexts.get(&prev_uq).unwrap().1.get(&uq);
-                            prob_prev = prev_into_stopword as f64 / features.get(&prev_lc).unwrap().tf;
+                            prob_prev =
+                                ctx.cases_term_is_followed(&prev_uq, &uq) as f64 / features.get(&prev_lc).unwrap().tf;
                         }
                         if j < uq_terms.len() {
                             // Not the last term
-                            // #next term occuring after this one / #next term
+                            // #next term occurring after this one / #next term
                             let next_uq = uq_terms.get(j + 1).unwrap();
                             let next_lc = lc_terms.get(j + 1).unwrap();
-                            let stopword_into_next = contexts.get(&uq).unwrap().1.get(&next_uq);
-                            prob_succ = stopword_into_next as f64 / features.get(&next_lc).unwrap().tf;
+                            prob_succ =
+                                ctx.cases_term_is_followed(&uq, &next_uq) as f64 / features.get(&next_lc).unwrap().tf;
+                            // fixme: Probability P(T[i+1] | T[i]) is weird.
+                            //        Why divide by Fr(T[i]) at first, but by Fr(T[i+1]) at second?
                         }
 
                         let prob = prob_prev * prob_succ;

@@ -11,6 +11,11 @@ fn test<const T: usize>(text: &str, lang: &str, cfg: Config, n_best: Option<usiz
 }
 
 #[test]
+fn empty() {
+    test("", "en", Config::default(), Some(1), []);
+}
+
+#[test]
 fn short() {
     test("this is a keyword", "en", Config::default(), Some(1), [("keyword", "keyword", 0.1583)]);
     // Results agree with reference implementation LIAAD/yake

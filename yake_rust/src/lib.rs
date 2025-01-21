@@ -372,7 +372,7 @@ impl Yake {
         let tf_nsw = words_nsw.values().map(|x| *x as f64);
         let std_tf = stddev(tf_nsw.clone());
         let mean_tf = mean(tf_nsw);
-        let max_tf = tf.max().unwrap() as f64;
+        let max_tf = tf.max().unwrap_or(0) as f64;
 
         let mut features = Features::new();
 

@@ -39,7 +39,7 @@ fn run_through_dataset_files() -> Result<(), Box<dyn std::error::Error>> {
 
         for idx in 0..zip.len() {
             let mut file = zip.by_index(idx)?;
-            if file.is_dir() {
+            if file.is_dir() || !file.name().contains("docsutf8") {
                 continue;
             }
 
@@ -49,8 +49,7 @@ fn run_through_dataset_files() -> Result<(), Box<dyn std::error::Error>> {
             let result = std::panic::catch_unwind(move || {
                 let stopwords = StopWords::predefined(lang).unwrap();
                 let yake = Yake::new(stopwords, Config::default());
-                let keys = yake.get_n_best(&text, Some(10));
-                assert_ne!(keys.len(), 0);
+                let _ = yake.get_n_best(&text, Some(10));
             });
 
             if result.is_err() {

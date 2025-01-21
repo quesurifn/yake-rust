@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Tests --include-ignored" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
-    <option name="command" value="test --workspace -- --include-ignored" />
+    <option name="command" value="test --workspace -- --include-ignored --nocapture" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <envs />
     <option name="emulateTerminal" value="true" />

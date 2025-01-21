@@ -3,16 +3,17 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
-use std::ops::Deref;
 
 use indexmap::{IndexMap, IndexSet};
 use plural_helper::PluralHelper;
 use preprocessor::{split_into_sentences, split_into_words};
 use stats::{mean, median, stddev};
 
+use crate::counter::Counter;
 use crate::levenshtein::levenshtein_ratio;
 pub use crate::stopwords::StopWords;
 
+mod counter;
 mod levenshtein;
 mod plural_helper;
 mod preprocessor;
@@ -31,7 +32,7 @@ type Sentences = Vec<Sentence>;
 type Candidates<'s> = IndexMap<&'s [LTerm], Candidate<'s>>;
 type Features<'s> = HashMap<&'s LTerm, TermStats>;
 type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
-type Contexts<'s> = HashMap<&'s UTerm, (Vec<&'s UTerm>, Vec<&'s UTerm>)>;
+type Contexts<'s> = HashMap<&'s UTerm, (Counter<&'s UTerm>, Counter<&'s UTerm>)>;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum Tag {
@@ -281,7 +282,7 @@ impl Yake {
     /// a given term and its predecessor AND a given term and its subsequent term,
     /// found within a window of a given size.
     fn build_context<'s>(&self, sentences: &'s [Sentence]) -> Contexts<'s> {
-        let mut contexts = Contexts::new();
+        let mut contexts = Contexts::default();
 
         for sentence in sentences {
             let mut window: VecDeque<(&String, &UTerm)> = VecDeque::with_capacity(self.config.window_size + 1);
@@ -301,9 +302,8 @@ impl Yake {
                             continue;
                         }
 
-                        // Context keys and elements are unique terms
-                        contexts.entry(term).or_default().0.push(left_uterm); // term: [.., ->left]
-                        contexts.entry(left_uterm).or_default().1.push(term); // left: [.., ->term]
+                        contexts.entry(term).or_default().0.inc(left_uterm); // term: [.., ->left]
+                        contexts.entry(left_uterm).or_default().1.inc(term); // left: [.., ->term]
                     }
                 }
 
@@ -451,11 +451,10 @@ impl Yake {
 
             {
                 if let Some((leftward, rightward)) = contexts.get(&u_term) {
-                    let distinct: HashSet<_> = HashSet::from_iter(leftward.iter().map(Deref::deref));
-                    stats.dl = if leftward.is_empty() { 0. } else { distinct.len() as f64 / leftward.len() as f64 };
-
-                    let distinct: HashSet<_> = HashSet::from_iter(rightward.iter().map(Deref::deref));
-                    stats.dr = if rightward.is_empty() { 0. } else { distinct.len() as f64 / rightward.len() as f64 };
+                    stats.dl =
+                        if leftward.is_empty() { 0. } else { leftward.distinct() as f64 / leftward.total() as f64 };
+                    stats.dr =
+                        if rightward.is_empty() { 0. } else { rightward.distinct() as f64 / rightward.total() as f64 };
                 }
 
                 stats.relatedness = 1.0 + (stats.dr + stats.dl) * (stats.tf / max_tf);
@@ -495,8 +494,7 @@ impl Yake {
                             // #previous term occuring before this one / #previous term
                             let prev_uq = uq_terms.get(j - 1).unwrap();
                             let prev_lc = lc_terms.get(j - 1).unwrap();
-                            let prev_into_stopword =
-                                contexts.get(&prev_uq).unwrap().1.iter().filter(|&w| *w == uq).count();
+                            let prev_into_stopword = contexts.get(&prev_uq).unwrap().1.get(&uq);
                             prob_prev = prev_into_stopword as f64 / features.get(&prev_lc).unwrap().tf;
                         }
                         if j < uq_terms.len() {
@@ -504,8 +502,7 @@ impl Yake {
                             // #next term occuring after this one / #next term
                             let next_uq = uq_terms.get(j + 1).unwrap();
                             let next_lc = lc_terms.get(j + 1).unwrap();
-                            let stopword_into_next =
-                                contexts.get(&uq).unwrap().1.iter().filter(|&w| *w == next_uq).count();
+                            let stopword_into_next = contexts.get(&uq).unwrap().1.get(&next_uq);
                             prob_succ = stopword_into_next as f64 / features.get(&next_lc).unwrap().tf;
                         }
 

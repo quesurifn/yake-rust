@@ -553,6 +553,7 @@ impl Yake {
                     if ignored.contains(lc_terms) {
                         continue;
                     }
+                    // todo: optimize: if some checks have failed, we may skip ngrams, by j += k
                     if !self.is_candidate(lc_terms) {
                         ignored.insert(lc_terms);
                         continue;

@@ -115,7 +115,8 @@ fn output_keywords(keywords: &Vec<ResultItem>, json: bool) {
                 println!("{}", str)
             }
             Err(e) => {
-                eprintln!("Unexpected error happened while trying to serialize result to json : {:?}", e)
+                eprintln!("Unexpected error happened while trying to serialize result to json : {:?}", e);
+                std::process::exit(exit_code::SOFTWARE_ERROR)
             }
         }
     } else {

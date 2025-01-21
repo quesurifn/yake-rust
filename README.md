@@ -5,14 +5,14 @@ paragraph, capitalization, how many sentences the keyword appears in, stopwords,
 these papers: [brief](https://repositorio.inesctec.pt/server/api/core/bitstreams/ef121a01-a0a6-4be8-945d-3324a58fc944/content),
 [extended](https://doi.org/10.1016/j.ins.2019.09.013).
 
-This crate is ported and is close as possible to the [reference implementation](https://github.com/LIAAD/yake/).
-The input text is split onto sentences and tokens via [segtok](https://github.com/xamgore/segtok) crate.
+This crate is ported and is as close as possible to the [reference implementation](https://github.com/LIAAD/yake/).
+The input text is split into sentences and tokens via [segtok](https://github.com/xamgore/segtok) crate.
 
 ## How it works
 
-For Yake ✨keyphrase✨ is an n-gram (1-, 2-, 3-) not starting and finishing with a stopword, not having numbers and punctuation inside, without long and short terms, etc.
+For Yake ✨keyphrase✨ is an n-gram (1-, 2-, 3-) not starting nor ending in a stopword, not having numbers and punctuation inside, without long and short terms, etc.
 
-Yake assigns an importance score $\mathbf{T}\_\text{Score}$ to each term in the text. The lower score, the better.
+Yake assigns an importance score $\mathbf{T}\_\text{Score}$ to each term in the text. The lower the score, the more important the term.
 
 $$
 \begin{flalign}
@@ -27,13 +27,13 @@ $$
 $$
 
 Eventually, the most important terms:
-- are more frequent
-- are mostly at the beggining
-- inhabit many sentences
+- occur more frequently
+- occur mostly at the beginning of the text
+- occur in many different sentences
 - prefer being Capitalized or UPPERCASED
-- prefer having the same neighbours
+- prefer having the same neighbour terms
 
-✨Keyphrases✨ are ranged: frequent & important at the top, noisy losers on the bottom.
+✨Keyphrases✨ are ranked in order of importance (most important first).
 
 Duplicates are then detected by [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance) and removed.
 

@@ -8,3 +8,4 @@ yake-rust = { path = "../yake_rust" , features = ["serde"]}
 clap = { version = "4.5.26", features = ["cargo", "derive", "string"] }
 serde_json = "1.0.135"
 exit-code = "1.0.0"
+prettytable-rs = "0.10.0"

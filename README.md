@@ -92,3 +92,33 @@ Results:
 | learning  | learning  | 0.1621 |
 | goldbloom | Goldbloom | 0.1625 |
 | machine   | machine   | 0.1672 |
+
+
+### CLI
+`yake` is the CLI implementation of `yake_rust`
+
+#### Basic usage
+```shell
+$ cargo install --path yake
+$ yake --input-file yake_rust/src/test_google.txt
+```
+#### More options
+
+```shell
+$ yake --help
+
+Usage: yake [OPTIONS] <--text-input <TEXT>|--input-file <FILE>>
+
+Options:
+      --text-input <TEXT>      Input text, SURROUNDED by single quotes(')
+  -i, --input-file <FILE>      Input file
+  -n, --ngram-size <INTEGER>   Max size of the ngram [default: 3]
+      --dedup-lim <FLOAT>      Deduplication limiter [default: 0.9]
+      --window-size <INTEGER>  Window size [default: 1]
+  -t, --top <INTEGER>          Number of keyphrases to extract
+  -v, --verbose                Gets detailed information (such as the score)
+  -l, --language <TEXT>        Language [default: en]
+      --json                   Dump output as JSON
+  -h, --help                   Print help
+  -V, --version                Print version
+```

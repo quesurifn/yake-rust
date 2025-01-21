@@ -371,6 +371,10 @@ mod liaad_yake_samples {
         //   recognizes "bereits" as a stopword and "bereit" as a non-stopword. The extra
         //   inclusion of "bereit" in the non-stopwords affects the TF statistics and thus
         //   the frequency contribution to the weights, leading to slightly different scores.
+        //
+        //   This is technically a bug in the reference implementation caused by the plural
+        //   normalization. This small discrepancy is thus acceptable.
+        //
     }
 
     #[test]
@@ -465,7 +469,6 @@ mod liaad_yake_samples {
     }
 
     #[test]
-    #[ignore = "Crashes due to failed unwrap"]
     fn portuguese_sport_sample_defaults() {
         // LIAAD/yake sample text
         test(
@@ -483,8 +486,10 @@ mod liaad_yake_samples {
                 ("Copa da Rússia", "copa da rússia", 0.0407),
                 ("seleção", "seleção", 0.0454),
                 ("brasileira", "brasileira", 0.0528),
+                ("meia Renato Augusto", "meia renato augusto", 0.0623),
             ],
         );
+        // Results agree with reference implementation LIAAD/yake
     }
 
     #[test]
@@ -580,6 +585,7 @@ mod liaad_yake_samples {
                 ("yüksek", "yüksek", 0.0513),
             ],
         );
+        // Results agree with reference implementation LIAAD/yake
     }
 
     #[test]
@@ -712,6 +718,7 @@ mod liaad_yake_samples {
                 ("traditional handoff scheme", "traditional handoff scheme", 0.0033),
             ],
         );
+        // Results agree with reference implementation LIAAD/yake
     }
 
     #[test]

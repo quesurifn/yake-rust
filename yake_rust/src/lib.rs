@@ -183,7 +183,6 @@ impl Yake {
         let features = self.extract_features(&context, vocabulary, &sentences);
 
         let mut ngrams: Candidates = self.ngram_selection(self.config.ngrams, &sentences);
-        self.filter_candidates(&mut ngrams, 3, false);
         Yake::candidate_weighting(features, &context, &mut ngrams);
 
         let mut results = ngrams
@@ -515,48 +514,50 @@ impl Yake {
         }
     }
 
-    fn filter_candidates(
-        &self,
-        candidates: &mut Candidates,
-        minimum_length: usize,
-        only_alphanumeric_and_hyphen: bool, // could be a function
-    ) {
-        // fixme: filter right before inserting into the set to optimize
-        candidates.retain(|_k, v| !{
-            let lc_terms = v.lc_terms;
-            let lc_words: HashSet<&LTerm> = HashSet::from_iter(lc_terms);
+    fn is_candidate(&self, lc_terms: &[LTerm], minimum_length: usize, only_alphanumeric_and_hyphen: bool) -> bool {
+        let lc_words: HashSet<&LTerm> = HashSet::from_iter(lc_terms);
 
-            let has_float = || lc_words.iter().any(|&w| self.is_d_tagged(w));
-            let has_stop_word = || self.is_stopword(&lc_terms[0]) || self.is_stopword(lc_terms.last().unwrap());
-            let has_unparsable = || lc_words.iter().any(|&w| self.is_u_tagged(w));
-            let not_enough_symbols = || lc_words.iter().map(|w| w.chars().count()).sum::<usize>() < minimum_length;
-            let has_non_alphanumeric =
-                || only_alphanumeric_and_hyphen && !lc_words.iter().all(word_is_alphanumeric_and_hyphen);
+        let has_float = || lc_words.iter().any(|&w| self.is_d_tagged(w));
+        let has_stop_word = || self.is_stopword(&lc_terms[0]) || self.is_stopword(lc_terms.last().unwrap());
+        let has_unparsable = || lc_words.iter().any(|&w| self.is_u_tagged(w));
+        let not_enough_symbols = || lc_words.iter().map(|w| w.chars().count()).sum::<usize>() < minimum_length;
+        let has_non_alphanumeric =
+            || only_alphanumeric_and_hyphen && !lc_words.iter().all(word_is_alphanumeric_and_hyphen);
 
-            // remove candidate if
-            has_float() || has_stop_word() || has_unparsable() || not_enough_symbols() || has_non_alphanumeric()
-        });
+        !{ has_float() || has_stop_word() || has_unparsable() || not_enough_symbols() || has_non_alphanumeric() }
     }
 
     fn ngram_selection<'s>(&self, n: usize, sentences: &'s Sentences) -> Candidates<'s> {
         let mut candidates = Candidates::new();
+        let mut ignored = HashSet::new();
+
         for sentence in sentences.iter() {
             let length = sentence.words.len();
+
             for j in 0..length {
                 for k in (j + 1..length + 1).take(n) {
                     if (j..k).is_empty() {
                         continue;
                     }
 
-                    let lc_words = &sentence.lc_terms[j..k];
-                    let candidate = candidates.entry(lc_words).or_default();
+                    let lc_terms = &sentence.lc_terms[j..k];
 
+                    if ignored.contains(lc_terms) {
+                        continue;
+                    }
+                    if !self.is_candidate(lc_terms, 3, false) {
+                        ignored.insert(lc_terms);
+                        continue;
+                    }
+
+                    let candidate = candidates.entry(lc_terms).or_default();
+                    candidate.lc_terms = lc_terms;
                     candidate.occurrences.push(&sentence.words[j..k]);
-                    candidate.lc_terms = lc_words;
                     candidate.uq_terms = &sentence.uq_terms[j..k];
                 }
             }
         }
+
         candidates
     }
 

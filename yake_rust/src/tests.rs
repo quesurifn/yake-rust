@@ -563,20 +563,18 @@ mod liaad_yake_samples {
             Config::default(),
             Some(10),
             [
-                ("OECD", "oecd", 0.0176),                               // LIAAD REFERENCE: 0.0178
-                ("Tek Bakışta Eğitim", "tek bakışta eğitim", 0.0232),   // LIAAD REFERENCE: 0.0236
-                ("eğitim", "eğitim", 0.0274),                           // LIAAD REFERENCE: 0.0278
-                ("OECD eğitim endeksi", "oecd eğitim endeksi", 0.0313), // LIAAD REFERENCE: 0.0323
-                ("OECD ortalamasının", "oecd ortalamasının", 0.0375),   // LIAAD REFERNENCE: 0.0383
-                ("Kalkınma Örgütü'nün", "kalkınma örgütü'nün", 0.0449), // LIAAD REFERENCE: 0.045
-                ("Tek Bakışta", "tek bakışta", 0.0449),                 // LIAAD REFERENCE: 0.045
+                ("OECD", "oecd", 0.0178),
+                ("Tek Bakışta Eğitim", "tek bakışta eğitim", 0.0236),
+                ("eğitim", "eğitim", 0.0278),
+                ("OECD eğitim endeksi", "oecd eğitim endeksi", 0.0323),
+                ("OECD ortalamasının", "oecd ortalamasının", 0.0383),
+                ("Kalkınma Örgütü'nün", "kalkınma örgütü'nün", 0.045),
+                ("Tek Bakışta", "tek bakışta", 0.045),
                 ("İşbirliği ve Kalkınma", "i̇şbirliği ve kalkınma", 0.0468),
-                ("Türkiye'de", "türkiye'de", 0.0476), // LIAAD REFERENCE: 0.0480
-                ("yüksek", "yüksek", 0.0509),         // LIAAD REFERENCE: 0.0513
+                ("Türkiye'de", "türkiye'de", 0.0480),
+                ("yüksek", "yüksek", 0.0513),
             ],
         );
-        // REASONS FOR DISCREPANCY:
-        // - Difference in tokenization.
     }
 
     #[test]
@@ -697,7 +695,7 @@ mod liaad_yake_samples {
             Config::default(),
             Some(10),
             [
-                ("Handoff Trigger Table", "handoff trigger table", 0.0006), // LIAAD REFERENCE: 0.0007
+                ("Handoff Trigger Table", "handoff trigger table", 0.0007),
                 ("Handoff", "handoff", 0.0010),
                 ("WLAN Networks ABSTRACT", "wlan networks abstract", 0.0019),
                 ("Vertical handoff", "vertical handoff", 0.0020),
@@ -709,8 +707,6 @@ mod liaad_yake_samples {
                 ("traditional handoff scheme", "traditional handoff scheme", 0.0033),
             ],
         );
-        // REASONS FOR DISCREPANCY:
-        // - Difference in sentence splitting.
     }
 
     #[test]

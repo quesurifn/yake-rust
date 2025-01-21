@@ -55,7 +55,7 @@ zh = []
 regex = "1"
 streaming-stats = "0.2.3"
 contractions = "0.5.4"
-segtok = "0.1.2"
+segtok = "0.1.3"
 levenshtein = "1.0.5"
 indexmap = "2.7.0"
 

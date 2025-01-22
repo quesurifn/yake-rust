@@ -90,7 +90,7 @@ contractions = "0.5.4"
 segtok = "0.1.0"
 levenshtein = "1.0.5"
 indexmap = "2.7.0"
-serde = "1.0.217"
+serde = { version = "1.0.217", optional = true }
 
 [lib]
 path = "src/lib.rs"

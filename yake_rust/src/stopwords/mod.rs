@@ -7,6 +7,7 @@ use crate::LString;
 /// The list is used to mark potentially meaningless tokens and generally based on the language
 /// given as input. Tokens with fewer than three characters are also considered a stopword.
 #[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StopWords {
     set: HashSet<LString>,
 }

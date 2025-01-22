@@ -2,51 +2,22 @@
 name = "yake-rust"
 version = "0.2.0"
 edition = "2021"
+
+# https://doc.rust-lang.org/cargo/reference/manifest.html
 authors = ["Kyle Fahey <kyle.c.r.fahey@gmail.com>"]
-keywords = ["keyword", "nlp", "keywords", "extractor"]
-repository = "https://github.com/quesurifn/yake-rust"
+categories = ["text-processing"]
 description = "Yake (Yet Another Keyword Extractor) in Rust"
-readme = "README.md"
+keywords = ["keyword", "nlp", "keywords", "extractor"]
 license = "MIT"
+readme = "../README.md"
+repository = "https://github.com/quesurifn/yake-rust"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
 default = [
-    "ar",
-    "bg",
-    "br",
-    "cz",
-    "da",
-    "de",
-    "el",
-    "en",
-    "es",
-    "et",
-    "fa",
-    "fi",
-    "fr",
-    "hi",
-    "hr",
-    "hu",
-    "hy",
-    "id",
-    "it",
-    "ja",
-    "lt",
-    "lv",
-    "nl",
-    "no",
-    "pl",
-    "pt",
-    "ro",
-    "ru",
-    "sk",
-    "sl",
-    "sv",
-    "tr",
-    "uk",
-    "zh",
+    "ar", "bg", "br", "cz", "da", "de", "el", "en", "es", "et", "fa", "fi", "fr", "hi", "hr", "hu", "hy", "id", "it", "ja",
+    "lt", "lv", "nl", "no", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "tr", "uk", "zh"
 ]
 ar = []
 bg = []
@@ -87,13 +58,23 @@ zh = []
 regex = "1"
 streaming-stats = "0.2.3"
 contractions = "0.5.4"
-segtok = "0.1.0"
+segtok = "0.1.3"
 levenshtein = "1.0.5"
 indexmap = "2.7.0"
 serde = { version = "1.0.217", optional = true }
 
+[dev-dependencies]
+divan = "0.1.17"
+rusty-hook = { workspace = true }
+pretty_assertions = "1.4.1"
+zip = { version = "2.2.2" }
+
 [lib]
 path = "src/lib.rs"
+
+[[bench]]
+name = "bench"
+harness = false
 
 [profile.dev]
 opt-level = 0

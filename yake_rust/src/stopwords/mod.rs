@@ -1,6 +1,7 @@
 use std::collections::HashSet;
+use std::ops::{Deref, DerefMut};
 
-use crate::LString;
+use crate::LTerm;
 
 /// List of lowercased words to be filtered out from the text.
 ///
@@ -9,12 +10,12 @@ use crate::LString;
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StopWords {
-    set: HashSet<LString>,
+    set: HashSet<LTerm>,
 }
 
 impl StopWords {
     /// Use the passed set of lowercased strings as stopwords.
-    pub fn custom(lowercased: HashSet<String>) -> Self {
+    pub fn custom(lowercased: HashSet<LTerm>) -> Self {
         StopWords { set: lowercased }
     }
 
@@ -102,16 +103,31 @@ impl StopWords {
 }
 
 impl StopWords {
-    pub fn contain(&self, word: &str) -> bool {
-        word.len() < 3 || self.set.contains(word)
+    pub fn contains(&self, word: &str) -> bool {
+        self.set.contains(word)
     }
+}
 
-    pub fn intersect_with(&self, words: &HashSet<&LString>) -> bool {
-        let intersects = if self.set.len() < words.len() {
-            self.set.iter().any(|w| words.contains(w))
-        } else {
-            words.iter().any(|&w| self.set.contains(w))
-        };
-        intersects || words.iter().any(|w| w.len() < 3)
+impl Deref for StopWords {
+    type Target = HashSet<LTerm>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.set
+    }
+}
+
+impl<T> AsRef<T> for StopWords
+where
+    T: ?Sized,
+    <StopWords as Deref>::Target: AsRef<T>,
+{
+    fn as_ref(&self) -> &T {
+        self.deref().as_ref()
+    }
+}
+
+impl DerefMut for StopWords {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.set
     }
 }

@@ -4,7 +4,7 @@ version = "0.2.0"
 edition = "2021"
 
 # https://doc.rust-lang.org/cargo/reference/manifest.html
-authors = ["Kyle Fahey <kyle.c.r.fahey@gmail.com>"]
+authors = ["Kyle Fahey <kyle.c.r.fahey@gmail.com>", "Anton Vikström"]
 categories = ["text-processing"]
 description = "Yake (Yet Another Keyword Extractor) in Rust"
 keywords = ["keyword", "nlp", "keywords", "extractor"]

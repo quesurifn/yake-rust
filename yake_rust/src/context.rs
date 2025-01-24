@@ -18,13 +18,13 @@ pub struct Contexts<'s> {
 }
 
 impl<'s> Contexts<'s> {
-    /// Record an occurrence
+    /// Record an occurrence.
     pub fn track(&mut self, left: &'s UTerm, right: &'s UTerm) {
         self.map.entry(right).or_default().follows.inc(left);
         self.map.entry(left).or_default().followed_by.inc(right);
     }
 
-    /// The total number of cases where `term` stands on the left side of `by`: `term .. by`
+    /// The total number of cases where `term` stands on the left side of `by`: `term…by`.
     pub fn cases_term_is_followed(&self, term: &'s UTerm, by: &'s UTerm) -> usize {
         self.map.get(&term).unwrap().followed_by.get(&by)
     }

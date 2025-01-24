@@ -9,7 +9,7 @@ pub fn split_into_words(text: &str) -> Vec<String> {
 }
 
 pub fn split_into_sentences(text: &str) -> Vec<String> {
-    split_multi(&text, Default::default()).into_iter().filter(|span| !span.is_empty()).collect()
+    split_multi(text, Default::default()).into_iter().filter(|span| !span.is_empty()).collect()
 }
 
 #[cfg(test)]

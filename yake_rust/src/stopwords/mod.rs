@@ -3,11 +3,13 @@ use std::ops::{Deref, DerefMut};
 
 use crate::LTerm;
 
-/// List of lowercased words to be filtered out from the text.
+/// Contains words to be filtered out from the resulting set.
 ///
-/// The list is used to mark potentially meaningless tokens and generally based on the language
-/// given as input. Tokens with fewer than three characters are also considered a stopword.
-#[derive(Debug, Default, Clone)]
+/// The list is used to mark potentially meaningless tokens and generally based on the _language_
+/// given as input.
+///
+/// Tokens with fewer than three characters are also considered a stopword.
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct StopWords {
     set: HashSet<LTerm>,
 }
@@ -19,13 +21,15 @@ impl StopWords {
     }
 
     /// Load a predefined list of stopwords for the language given as argument.
-    pub fn predefined(lang: &str) -> Option<Self> {
+    ///
+    /// The argument is a [ISO 639 two-letter code](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes).
+    pub fn predefined(lang_iso_639_2: &str) -> Option<Self> {
         // https://github.com/LIAAD/yake/tree/0fa58cceb465162b6bd0cab7ec967edeb907fbcc/yake/StopwordsList
         // files were taken from the original repository, with extra modifications:
         // - add extra line at the end
         // - fix encoding, convert to utf8
         // - switch from CRLF to LF
-        let file = match lang {
+        let file = match lang_iso_639_2 {
             #[cfg(feature = "ar")]
             "ar" => include_str!("ar.txt"),
             #[cfg(feature = "bg")]
@@ -98,12 +102,6 @@ impl StopWords {
         };
 
         Some(Self { set: file.lines().map(ToOwned::to_owned).collect() })
-    }
-}
-
-impl StopWords {
-    pub fn contains(&self, word: &str) -> bool {
-        self.set.contains(word)
     }
 }
 

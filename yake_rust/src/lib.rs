@@ -1,5 +1,10 @@
+#![cfg_attr(not(doctest), doc = include_str!("../README.md"))]
 #![allow(clippy::len_zero)]
 #![allow(clippy::type_complexity)]
+#![deny(rustdoc::broken_intra_doc_links)]
+#![deny(rustdoc::private_intra_doc_links)]
+#![deny(unused_imports)]
+#![warn(missing_docs)]
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
@@ -19,6 +24,9 @@ mod levenshtein;
 mod plural_helper;
 mod preprocessor;
 mod stopwords;
+
+#[cfg(test)]
+mod tests;
 
 /// String from the original text
 type RawString = String;
@@ -55,7 +63,7 @@ struct Occurrence<'sentence> {
     pub word: &'sentence String,
 }
 
-impl<'s> Occurrence<'s> {
+impl Occurrence<'_> {
     /// USA, USSR, but not B2C.
     fn _is_acronym(&self) -> bool {
         self.word.len() > 1 && self.word.chars().all(char::is_uppercase)
@@ -100,16 +108,30 @@ struct TermStats {
     score: f64,
 }
 
+/// Represents a key phrase.
 #[derive(PartialEq, Clone, Debug)]
 pub struct ResultItem {
-    pub raw: String,
+    /// A lowercased key phrase consisting of 1…N words, where N is configured through [`Config::ngrams`].
     pub keyword: LTerm,
+    /// The first occurrence in the text. Not exact, as words are joined by a single space.
+    pub raw: String,
+    /// Key importance, where 0 is the most important.
     pub score: f64,
 }
 
 impl PartialEq<(&str, &str, f64)> for ResultItem {
-    fn eq(&self, (raw, keyword, score): &(&str, &str, f64)) -> bool {
-        self.raw.eq(raw) && self.keyword.eq(keyword) && self.score.eq(score)
+    fn eq(&self, (raw, key_phrase, score): &(&str, &str, f64)) -> bool {
+        self.raw.eq(raw) && self.keyword.eq(key_phrase) && self.score.eq(score)
+    }
+}
+
+impl From<Candidate<'_>> for ResultItem {
+    fn from(candidate: Candidate) -> Self {
+        ResultItem {
+            raw: candidate.occurrences[0].join(" "),
+            keyword: candidate.lc_terms.join(" "),
+            score: candidate.score,
+        }
     }
 }
 
@@ -130,40 +152,50 @@ struct Candidate<'s> {
     pub score: f64,
 }
 
-#[derive(Debug, Clone)]
+/// Fine-tunes keyword extraction.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Config {
-    /// The number of n-grams.
+    /// How many words a key phrase may contain.
     ///
     /// _n-gram_ is a contiguous sequence of _n_ words occurring in the text.
     pub ngrams: usize,
     /// List of punctuation symbols.
     ///
-    /// They are known as _exclude chars_ in the original implementation.
+    /// They are known as _exclude chars_ in the [original implementation](https://github.com/LIAAD/yake).
     pub punctuation: HashSet<char>,
+
+    /// The number of tokens both preceding and following a term to calculate _term dispersion_ metric.
     pub window_size: usize,
-    pub remove_duplicates: bool,
-    /// A threshold in range 0..1.
-    pub deduplication_threshold: f64,
     /// When `true`, calculate _term casing_ metric by counting capitalized terms _without_
     /// intermediate uppercase letters. Thus, `Paypal` is counted while `PayPal` is not.
     ///
-    /// The [original implementation](https://github.com/LIAAD/) sticks with `true`.
+    /// The [original implementation](https://github.com/LIAAD/yake) sticks with `true`.
     pub strict_capital: bool,
 
     /// When `true`, key phrases are allowed to have only alphanumeric characters and hyphen.
     pub only_alphanumeric_and_hyphen: bool,
     /// Key phrases can't be too short, less than `minimum_chars` in total.
     pub minimum_chars: usize,
+
+    /// When `true`, similar key phrases are deduplicated.
+    ///
+    /// Key phrases are considered similar if their Levenshtein distance is greater than
+    /// [`deduplication_threshold`](Config::deduplication_threshold).
+    pub remove_duplicates: bool,
+    /// A threshold in range 0..1. Equal strings have the distance equal to 1.
+    ///
+    /// Effective only when [`remove_duplicates`](Config::remove_duplicates) is `true`.
+    pub deduplication_threshold: f64,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             punctuation: r##"!"#$%&'()*+,-./:,<=>?@[\]^_`{|}~"##.chars().collect(),
-            window_size: 1,
             deduplication_threshold: 0.9,
             ngrams: 3,
             remove_duplicates: true,
+            window_size: 1,
             strict_capital: true,
             only_alphanumeric_and_hyphen: false,
             minimum_chars: 3,
@@ -178,6 +210,7 @@ pub struct Yake {
 }
 
 impl Yake {
+    #[allow(missing_docs)]
     pub fn new(stop_words: StopWords, config: Config) -> Yake {
         Self { config, stop_words }
     }
@@ -192,15 +225,7 @@ impl Yake {
         let mut ngrams: Candidates = self.ngram_selection(self.config.ngrams, &sentences);
         Yake::candidate_weighting(features, &context, &mut ngrams);
 
-        let mut results = ngrams
-            .into_iter()
-            .map(|(_, candidate)| {
-                let raw = candidate.occurrences[0].join(" ");
-                let keyword = candidate.lc_terms.join(" ");
-                ResultItem { raw, keyword, score: candidate.score }
-            })
-            .collect::<Vec<_>>();
-
+        let mut results: Vec<ResultItem> = ngrams.into_values().map(Into::into).collect();
         results.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
 
         let n = n.unwrap_or(usize::MAX);
@@ -222,10 +247,6 @@ impl Yake {
             || self.stop_words.contains(lc_term.to_single())
             // having less than 3 non-punctuation symbols is typical for stop words
             || lc_term.to_single().chars().filter(|ch| !self.config.punctuation.contains(ch)).count() < 3
-    }
-
-    pub fn contains_stopword(&self, words: &HashSet<&LTerm>) -> bool {
-        words.iter().any(|w| self.is_stopword(w))
     }
 
     fn remove_duplicates(&self, results: Vec<ResultItem>, n: usize) -> Vec<ResultItem> {
@@ -318,10 +339,12 @@ impl Yake {
         ctx
     }
 
+    /// Numeric.
     fn is_d_tagged(&self, word: &str) -> bool {
         word.replace(",", "").parse::<f64>().is_ok()
     }
 
+    /// Unparsable.
     fn is_u_tagged(&self, word: &str) -> bool {
         self.word_has_multiple_punctuation_symbols(word) || {
             let nr_of_digits = word.chars().filter(|w| w.is_ascii_digit()).count();
@@ -330,10 +353,12 @@ impl Yake {
         }
     }
 
+    /// Acronym.
     fn is_a_tagged(&self, word: &str) -> bool {
         word.chars().all(char::is_uppercase)
     }
 
+    /// Uppercase.
     fn is_n_tagged(&self, occurrence: &Occurrence) -> bool {
         let is_capital =
             if self.config.strict_capital { Occurrence::is_capitalized } else { Occurrence::is_uppercased };
@@ -490,7 +515,7 @@ impl Yake {
                             let prev_uq = uq_terms.get(j - 1).unwrap();
                             let prev_lc = lc_terms.get(j - 1).unwrap();
                             prob_prev =
-                                ctx.cases_term_is_followed(&prev_uq, &uq) as f64 / features.get(&prev_lc).unwrap().tf;
+                                ctx.cases_term_is_followed(prev_uq, uq) as f64 / features.get(&prev_lc).unwrap().tf;
                         }
                         if j < uq_terms.len() {
                             // Not the last term
@@ -498,9 +523,7 @@ impl Yake {
                             let next_uq = uq_terms.get(j + 1).unwrap();
                             let next_lc = lc_terms.get(j + 1).unwrap();
                             prob_succ =
-                                ctx.cases_term_is_followed(&uq, &next_uq) as f64 / features.get(&next_lc).unwrap().tf;
-                            // fixme: Probability P(T[i+1] | T[i]) is weird.
-                            //        Why divide by Fr(T[i]) at first, but by Fr(T[i+1]) at second?
+                                ctx.cases_term_is_followed(uq, next_uq) as f64 / features.get(&next_lc).unwrap().tf;
                         }
 
                         let prob = prob_prev * prob_succ;
@@ -582,6 +605,3 @@ impl Yake {
 fn word_is_alphanumeric_and_hyphen(word: impl AsRef<str>) -> bool {
     word.as_ref().chars().all(|ch| ch.is_alphanumeric() || ch == '-')
 }
-
-#[cfg(test)]
-mod tests;

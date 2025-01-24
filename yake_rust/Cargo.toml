@@ -73,9 +73,3 @@ path = "src/lib.rs"
 [[bench]]
 name = "bench"
 harness = false
-
-[profile.dev]
-opt-level = 0
-
-[profile.release]
-opt-level = 3

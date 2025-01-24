@@ -203,19 +203,25 @@ impl Default for Config {
     }
 }
 
+/// Extract the top N most important key phrases from the text.
+///
+/// If you need all the keywords, pass [`usize::MAX`].
+pub fn get_n_best(n: usize, text: &str, stop_words: &StopWords, config: &Config) -> Vec<ResultItem> {
+    Yake::new(stop_words.clone(), config.clone()).get_n_best(text, n)
+}
+
 #[derive(Debug, Clone)]
-pub struct Yake {
+struct Yake {
     config: Config,
     stop_words: StopWords,
 }
 
 impl Yake {
-    #[allow(missing_docs)]
     pub fn new(stop_words: StopWords, config: Config) -> Yake {
         Self { config, stop_words }
     }
 
-    pub fn get_n_best(&self, text: &str, n: usize) -> Vec<ResultItem> {
+    fn get_n_best(&self, text: &str, n: usize) -> Vec<ResultItem> {
         let sentences = self.preprocess_text(text);
 
         let context = self.build_context(&sentences);

@@ -28,14 +28,14 @@ Duplicates are then detected by [Levenshtein distance](https://en.wikipedia.org/
 ## Example
 
 ```rust
-use yake_rust::*;
+use yake_rust::{get_n_best, Config, StopWords};
 
 fn main() {
     let text = include_str!("input.txt");
 
-    let keywords =
-        Yake::new(StopWords::predefined("en").unwrap(), Config::default())
-            .get_n_best(text, 10);
+    let config = Config { ngrams: 3, ..Config::default() };
+    let ignored = StopWords::predefined("en").unwrap();
+    let keywords = get_n_best(10, &text, &ignored, &config);
 
     println!("{:?}", keywords);
 }

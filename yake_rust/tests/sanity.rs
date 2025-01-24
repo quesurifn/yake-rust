@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::{BufReader, Read};
 
-use yake_rust::{Config, StopWords, Yake};
+use yake_rust::{get_n_best, Config, StopWords};
 use zip::ZipArchive;
 
 #[test]
@@ -37,6 +37,9 @@ fn run_through_dataset_files() -> Result<(), Box<dyn std::error::Error>> {
         let filename = format!("{filename}.zip");
         let mut zip = ZipArchive::new(BufReader::new(File::open(filename)?))?;
 
+        let ignored = StopWords::predefined(lang).unwrap();
+        let cfg = Config::default();
+
         for idx in 0..zip.len() {
             let mut file = zip.by_index(idx)?;
             if file.is_dir() || !file.name().contains("docsutf8") {
@@ -46,10 +49,8 @@ fn run_through_dataset_files() -> Result<(), Box<dyn std::error::Error>> {
             let mut text = String::new();
             file.read_to_string(&mut text).unwrap();
 
-            let result = std::panic::catch_unwind(move || {
-                let stopwords = StopWords::predefined(lang).unwrap();
-                let yake = Yake::new(stopwords, Config::default());
-                let _ = yake.get_n_best(&text, 10);
+            let result = std::panic::catch_unwind(|| {
+                let _ = get_n_best(10, &text, &ignored, &cfg);
             });
 
             if result.is_err() {

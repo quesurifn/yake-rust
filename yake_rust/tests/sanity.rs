@@ -49,7 +49,7 @@ fn run_through_dataset_files() -> Result<(), Box<dyn std::error::Error>> {
             let result = std::panic::catch_unwind(move || {
                 let stopwords = StopWords::predefined(lang).unwrap();
                 let yake = Yake::new(stopwords, Config::default());
-                let _ = yake.get_n_best(&text, Some(10));
+                let _ = yake.get_n_best(&text, 10);
             });
 
             if result.is_err() {

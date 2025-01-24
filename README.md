@@ -47,7 +47,7 @@ fn main() {
 
     let keywords =
         Yake::new(StopWords::predefined("en").unwrap(), Config::default())
-            .get_n_best(text, Some(10));
+            .get_n_best(text, 10);
 
     println!("{:?}", keywords);
 }

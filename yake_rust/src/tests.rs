@@ -2,7 +2,7 @@ use pretty_assertions::assert_eq;
 
 use super::*;
 
-fn test<const T: usize>(text: &str, lang: &str, cfg: Config, n_best: Option<usize>, expected: [(&str, &str, f64); T]) {
+fn test<const T: usize>(text: &str, lang: &str, cfg: Config, n_best: usize, expected: [(&str, &str, f64); T]) {
     let stopwords = StopWords::predefined(lang).unwrap();
     let mut actual = Yake::new(stopwords, cfg).get_n_best(text, n_best);
     // leave only 4 digits
@@ -12,12 +12,12 @@ fn test<const T: usize>(text: &str, lang: &str, cfg: Config, n_best: Option<usiz
 
 #[test]
 fn empty() {
-    test("", "en", Config::default(), Some(1), []);
+    test("", "en", Config::default(), 1, []);
 }
 
 #[test]
 fn short() {
-    test("this is a keyword", "en", Config::default(), Some(1), [("keyword", "keyword", 0.1583)]);
+    test("this is a keyword", "en", Config::default(), 1, [("keyword", "keyword", 0.1583)]);
     // Results agree with reference implementation LIAAD/yake
 }
 
@@ -28,7 +28,7 @@ fn keywords_order_is_preserved() {
         "Machine learning",
         "en",
         Config { ngrams: 1, ..Default::default() },
-        Some(3),
+        3,
         [("Machine", "machine", 0.1583), ("learning", "learning", 0.1583)],
     );
     // Results agree with reference implementation LIAAD/yake
@@ -40,7 +40,7 @@ fn laptop() {
         "Do you need an Apple laptop?",
         "en",
         Config { ngrams: 1, ..Default::default() },
-        Some(2),
+        2,
         [("Apple", "apple", 0.1448), ("laptop", "laptop", 0.1583)],
     );
     // Results agree with reference implementation LIAAD/yake
@@ -54,7 +54,7 @@ fn headphones() {
             If you need headphones, we've got you covered!",
         "en",
         Config { ngrams: 1, ..Default::default() },
-        Some(3),
+        3,
         [("headphones", "headphones", 0.1141), ("Saturday", "saturday", 0.2111), ("Starting", "starting", 0.4096)],
     );
     // Results agree with reference implementation LIAAD/yake
@@ -66,7 +66,7 @@ fn multi_ngram() {
         "I will give you a great deal if you just read this!",
         "en",
         Config { ngrams: 2, ..Default::default() },
-        Some(1),
+        1,
         [("great deal", "great deal", 0.0257)],
     );
     // Results agree with reference implementation LIAAD/yake
@@ -79,7 +79,7 @@ fn singular() {
         "One smartwatch. One phone. Many phone.",
         "en",
         Config { ngrams: 1, ..Default::default() },
-        Some(2),
+        2,
         [("smartwatch", "smartwatch", 0.2025), ("phone", "phone", 0.2474)],
     );
     // Results agree with reference implementation LIAAD/yake
@@ -91,7 +91,7 @@ fn plural() {
         "One smartwatch. One phone. Many phones.",
         "en",
         Config { ngrams: 1, ..Default::default() },
-        Some(3),
+        3,
         [("smartwatch", "smartwatch", 0.2025), ("phone", "phone", 0.4949), ("phones", "phones", 0.4949)],
     );
     // Results agree with reference implementation LIAAD/yake
@@ -100,25 +100,13 @@ fn plural() {
 #[test]
 fn non_hyphenated() {
     // For comparison with the "hyphenated" test
-    test(
-        "Truly high tech!",
-        "en",
-        Config { ngrams: 2, ..Default::default() },
-        Some(1),
-        [("high tech", "high tech", 0.0494)],
-    );
+    test("Truly high tech!", "en", Config { ngrams: 2, ..Default::default() }, 1, [("high tech", "high tech", 0.0494)]);
     // Results agree with reference implementation LIAAD/yake
 }
 
 #[test]
 fn hyphenated() {
-    test(
-        "Truly high-tech!",
-        "en",
-        Config { ngrams: 2, ..Default::default() },
-        Some(1),
-        [("high-tech", "high-tech", 0.1583)],
-    );
+    test("Truly high-tech!", "en", Config { ngrams: 2, ..Default::default() }, 1, [("high-tech", "high-tech", 0.1583)]);
     // Results agree with reference implementation LIAAD/yake
 }
 
@@ -128,7 +116,7 @@ fn weekly_newsletter_short() {
         "This is your weekly newsletter!",
         "en",
         Config { ngrams: 2, ..Default::default() },
-        Some(3),
+        3,
         [
             ("weekly newsletter", "weekly newsletter", 0.0494),
             ("newsletter", "newsletter", 0.1583),
@@ -146,7 +134,7 @@ fn weekly_newsletter_long() {
         to high-tech drones!",
         "en",
         Config { ngrams: 2, ..Default::default() },
-        Some(5),
+        5,
         [
             ("weekly newsletter", "weekly newsletter", 0.0780),
             ("newsletter", "newsletter", 0.2005),
@@ -166,7 +154,7 @@ fn weekly_newsletter_long_with_paragraphs() {
         to high-tech drones!",
         "en",
         Config { ngrams: 2, ..Default::default() },
-        Some(5),
+        5,
         [
             ("weekly newsletter", "weekly newsletter", 0.0780),
             ("newsletter", "newsletter", 0.2005),
@@ -184,7 +172,7 @@ fn composite_recurring_words_and_bigger_window() {
         "Machine learning is a growing field. Few research fields grow as much as machine learning grows.",
         "en",
         Config { ngrams: 2, window_size: 2, ..Default::default() },
-        Some(5),
+        5,
         [
             ("Machine learning", "machine learning", 0.1346),
             ("growing field", "growing field", 0.1672),
@@ -202,7 +190,7 @@ fn composite_recurring_words_near_numbers() {
         "I buy 100 yellow bananas every day. Every night I eat bananas - all but 5 bananas.",
         "en",
         Config { ngrams: 2, ..Default::default() },
-        Some(3),
+        3,
         [("yellow bananas", "yellow bananas", 0.0682), ("buy", "buy", 0.1428), ("yellow", "yellow", 0.1428)],
     );
     // Results agree with reference implementation LIAAD/yake
@@ -215,7 +203,7 @@ fn composite_recurring_words_near_spelled_out_numbers() {
         "I buy a hundred yellow bananas every day. Every night I eat bananas - all but five bananas.",
         "en",
         Config { ngrams: 2, ..Default::default() },
-        Some(3),
+        3,
         [
             ("hundred yellow", "hundred yellow", 0.0446),
             ("yellow bananas", "yellow bananas", 0.1017),
@@ -231,7 +219,7 @@ fn with_stopword_in_the_middle() {
         "Game of Thrones",
         "en",
         Config { remove_duplicates: false, ..Config::default() },
-        Some(1),
+        1,
         [("Game of Thrones", "game of thrones", 0.01380)],
     );
     // Results agree with reference implementation LIAAD/yake
@@ -247,7 +235,7 @@ mod liaad_yake_samples {
             include_str!("test_google.txt"),
             "en",
             Config { ngrams: 1, ..Default::default() },
-            Some(10),
+            10,
             [
                 ("Google", "google", 0.0251),
                 ("Kaggle", "kaggle", 0.0273),
@@ -271,7 +259,7 @@ mod liaad_yake_samples {
             include_str!("test_google.txt"),
             "en",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("Google", "google", 0.0251),
                 ("Kaggle", "kaggle", 0.0273),
@@ -295,7 +283,7 @@ mod liaad_yake_samples {
             include_str!("test_gitter.txt"),
             "en",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("Gitter", "gitter", 0.0190),
                 ("GitLab", "gitlab", 0.0478),
@@ -319,7 +307,7 @@ mod liaad_yake_samples {
             include_str!("test_genius.txt"),
             "en",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("Genius", "genius", 0.0261),
                 ("company", "company", 0.0263),
@@ -343,7 +331,7 @@ mod liaad_yake_samples {
             include_str!("test_german.txt"),
             "de",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("Vereinigten Staaten", "vereinigten staaten", 0.0152), // LIAAD REFERENCE: 0.151
                 ("Präsidenten Donald Trump", "präsidenten donald trump", 0.0182),
@@ -384,7 +372,7 @@ mod liaad_yake_samples {
             include_str!("test_nl.txt"),
             "nl",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("Vincent van Gogh", "vincent van gogh", 0.0111),
                 ("Gogh Museum", "gogh museum", 0.0125),
@@ -408,7 +396,7 @@ mod liaad_yake_samples {
             include_str!("test_fi.txt"),
             "fi",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("Mobile Networks", "mobile networks", 0.0043),
                 ("Nokia tekee muutoksia", "nokia tekee muutoksia", 0.0061),
@@ -432,7 +420,7 @@ mod liaad_yake_samples {
             include_str!("test_it.txt"),
             "it",
             Config::default(),
-            Some(5),
+            5,
             [
                 ("Champions League", "champions league", 0.0390),
                 ("Quarti", "quarti", 0.0520),
@@ -451,7 +439,7 @@ mod liaad_yake_samples {
             include_str!("test_fr.txt"),
             "fr",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("dégrade en France", "dégrade en france", 0.0254),
                 ("jusque-là uniquement associée", "jusque-là uniquement associée", 0.0504),
@@ -475,7 +463,7 @@ mod liaad_yake_samples {
             include_str!("test_pt_1.txt"),
             "pt",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("seleção brasileira treinará", "seleção brasileira treinará", 0.0072),
                 ("seleção brasileira", "seleção brasileira", 0.0100),
@@ -499,7 +487,7 @@ mod liaad_yake_samples {
             include_str!("test_pt_2.txt"),
             "pt",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("Alvor", "alvor", 0.0165),
                 ("Rio Alvor", "rio alvor", 0.0336),
@@ -523,7 +511,7 @@ mod liaad_yake_samples {
             include_str!("test_es.txt"),
             "es",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("Guerra Civil Española", "guerra civil española", 0.0032),
                 ("Guerra Civil", "guerra civil", 0.0130),
@@ -547,7 +535,7 @@ mod liaad_yake_samples {
             include_str!("test_pl.txt"),
             "pl",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("franka", "franka", 0.0328),
                 ("Geerta Wildersa VVD", "geerta wildersa vvd", 0.0346),
@@ -571,7 +559,7 @@ mod liaad_yake_samples {
             include_str!("test_tr.txt"),
             "tr",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("OECD", "oecd", 0.0178),
                 ("Tek Bakışta Eğitim", "tek bakışta eğitim", 0.0236),
@@ -595,7 +583,7 @@ mod liaad_yake_samples {
             include_str!("test_ar.txt"),
             "ar",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("عبد السلام العجيلي", "عبد السلام العجيلي", 0.0105),
                 ("اللغة العربية الأربعاء", "اللغة العربية الأربعاء", 0.0139),
@@ -618,7 +606,7 @@ mod liaad_yake_samples {
             include_str!("test_data_1.txt"),
             "pt",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("Médio Oriente continua", "médio oriente continua", 0.0008),
                 ("Médio Oriente", "médio oriente", 0.0045),
@@ -642,7 +630,7 @@ mod liaad_yake_samples {
             include_str!("test_data_2.txt"),
             "en",
             Config::default(),
-            Some(5),
+            5,
             [
                 ("highly radioactive water", "highly radioactive water", 0.0006),
                 ("crippled nuclear plant", "crippled nuclear plant", 0.0006),
@@ -661,7 +649,7 @@ mod liaad_yake_samples {
             include_str!("test_data_3.txt"),
             "en",
             Config::default(),
-            Some(5),
+            5,
             [
                 ("Global Crossing", "global crossing", 0.0034),
                 ("Hutchison Telecommunications", "hutchison telecommunications", 0.0053),
@@ -680,7 +668,7 @@ mod liaad_yake_samples {
             include_str!("test_data_4.txt"),
             "en",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("annual revenues increasing", "annual revenues increasing", 0.0018),
                 ("retail inventory management", "retail inventory management", 0.0023),
@@ -704,7 +692,7 @@ mod liaad_yake_samples {
             include_str!("test_data_5.txt"),
             "en",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("Handoff Trigger Table", "handoff trigger table", 0.0007),
                 ("Handoff", "handoff", 0.0010),
@@ -728,7 +716,7 @@ mod liaad_yake_samples {
             include_str!("test_data_6.txt"),
             "en",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("MRSA", "mrsa", 0.0047),
                 ("TSN Database", "tsn database", 0.0107),
@@ -752,7 +740,7 @@ mod liaad_yake_samples {
             include_str!("test_data_7.txt"),
             "en",
             Config::default(),
-            Some(10),
+            10,
             [
                 ("Environment Design Level", "environment design level", 0.0008),
                 ("Jerusalem Jerusalem", "jerusalem jerusalem", 0.0009),

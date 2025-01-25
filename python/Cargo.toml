@@ -2,6 +2,8 @@
 name = "yake-rust-python-bindings"
 version = "1.0.0"
 edition = "2021"
+readme = "README.md"
+license = "LICENSE"
 
 [dependencies]
 pyo3 = "0.23.4"

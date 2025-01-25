@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "yake-rust"
-dynamic = ["version"]
+dynamic = ["version", "readme", "license"]
 description = "Python bindings for the yake-rust crate."
 authors = [
   {name="Anton Vikström"},

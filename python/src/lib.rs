@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 
 #[pyclass]
@@ -11,8 +12,10 @@ struct Yake {
 #[pymethods]
 impl Yake {
     #[new]
-    #[pyo3(signature = (ngrams=None, punctuation=None, window_size=None, remove_duplicates=None, deduplication_threshold=None, strict_capital=None, only_alphanumeric_and_hyphen=None, minimum_chars=None, stopwords=None, language=None))]
+    #[pyo3(signature = (stopwords=None, language=None, ngrams=None, punctuation=None, window_size=None, remove_duplicates=None, deduplication_threshold=None, strict_capital=None, only_alphanumeric_and_hyphen=None, minimum_chars=None))]
     fn new(
+        stopwords: Option<HashSet<String>>,
+        language: Option<String>,
         ngrams: Option<usize>,
         punctuation: Option<HashSet<char>>,
         window_size: Option<usize>,
@@ -21,16 +24,18 @@ impl Yake {
         strict_capital: Option<bool>,
         only_alphanumeric_and_hyphen: Option<bool>,
         minimum_chars: Option<usize>,
-        stopwords: Option<HashSet<String>>,
-        language: Option<String>,
-    ) -> Self {
+    ) -> PyResult<Self> {
         let default_config = yake_rust::Config::default();
-        let mut used_stopwords: Option<yake_rust::StopWords> = None;
-        if stopwords.is_some() {
-            used_stopwords = Some(yake_rust::StopWords::custom(stopwords.unwrap()));
-        } else {
-            used_stopwords = yake_rust::StopWords::predefined(&language.unwrap());
+        if stopwords.is_none() == language.is_none() {
+            return Err(PyTypeError::new_err("Provide either language or stopwords, but not both."));
         }
+        let used_stopwords: Option<yake_rust::StopWords> = {
+            if stopwords.is_some() {
+                Some(yake_rust::StopWords::custom(stopwords.unwrap()))
+            } else {
+                yake_rust::StopWords::predefined(&language.unwrap())
+            }
+        };
         let config = yake_rust::Config {
             ngrams: ngrams.unwrap_or(default_config.ngrams),
             punctuation: punctuation.unwrap_or(default_config.punctuation),
@@ -42,10 +47,14 @@ impl Yake {
                 .unwrap_or(default_config.only_alphanumeric_and_hyphen),
             minimum_chars: minimum_chars.unwrap_or(default_config.minimum_chars),
         };
-        Yake { _config: config, _stopwords: used_stopwords.unwrap() }
+        Ok(Yake { _config: config, _stopwords: used_stopwords.unwrap() })
     }
 
-    #[pyo3(signature = (text, n))]
+    /// get_n_best(self, text, *, n)
+    /// --
+    ///
+    /// Get the n best keywords from text.
+    #[pyo3(signature = (text, *, n))]
     pub fn get_n_best(&mut self, py: Python, text: String, n: usize) -> Vec<(String, f64)> {
         py.allow_threads(|| get_n_best_sequential(n, text, &self._stopwords, &self._config))
     }

@@ -4,6 +4,7 @@ version = "1.0.0"
 edition = "2021"
 readme = "README.md"
 license = "LICENSE"
+repository = "https://github.com/quesurifn/yake-rust"
 
 [dependencies]
 pyo3 = "0.23.4"

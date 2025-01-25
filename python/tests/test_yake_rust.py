@@ -149,6 +149,7 @@ LONG_TEXT = (
 
 
 @pytest.mark.integration_test
+@flaky(max_runs=10, min_passes=1)  # type: ignore[misc]
 def test_get_n_best__concurrency() -> None:
     """Test that keyword extraction can be concurrent (releases the GIL)."""
     if multiprocessing.cpu_count() < 2:

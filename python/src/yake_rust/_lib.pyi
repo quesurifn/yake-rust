@@ -2,12 +2,28 @@
 
 from __future__ import annotations
 
+from typing import overload
+
 class Yake:
+    @overload
     def __init__(
         self,
         *,
-        stopwords: set[str] | None = None,
-        language: str | None = None,
+        language: str,
+        ngrams: int | None = None,
+        punctuation: set[str] | None = None,
+        window_size: int | None = None,
+        remove_duplicates: bool | None = None,
+        deduplication_threshold: float | None = None,
+        strict_capital: bool | None = None,
+        only_alphanumeric_and_hyphen: bool | None = None,
+        minimum_chars: int | None = None,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self,
+        *,
+        stopwords: set[str],
         ngrams: int | None = None,
         punctuation: set[str] | None = None,
         window_size: int | None = None,

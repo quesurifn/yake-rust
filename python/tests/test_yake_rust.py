@@ -240,7 +240,7 @@ def test_get_n_best__race_liaad_yake__short_text() -> None:
 
 
 @pytest.mark.slow_integration_test
-@flaky(max_runs=10, min_passes=8)  # type: ignore[misc]
+@flaky(max_runs=100, min_passes=100)  # type: ignore[misc]
 def test_get_n_best__race_liaad_yake__long_text() -> None:
     dt_liaad, dt_rust = _run_yake_rust_and_liaad_yake(
         LONG_TEXT,

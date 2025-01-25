@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 
-#[pyclass(module = "yake_rust")]
+#[pyclass(module = "yake_rust", frozen)]
 struct Yake {
     _config: yake_rust::Config,
     _stopwords: yake_rust::StopWords,

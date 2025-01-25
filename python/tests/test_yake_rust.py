@@ -156,20 +156,28 @@ def test_get_n_best__concurrency() -> None:
 
     # Long text to make it slow
     texts = [LONG_TEXT] * 4
+    results: list[list[tuple[str, float]]] = [[]] * len(texts)
+    expected_result = [("Lorem ipsum dolor", pytest.approx(0.000436, abs=0.0001))]
     yake = yake_rust.Yake(ngrams=3, window_size=2, language="en")
 
     t0_sequential = time.perf_counter()
-    for text in texts:
-        _ = yake.get_n_best(text, n=1)
+    for index, text in enumerate(texts):
+        results[index] = yake.get_n_best(text, n=1)
     dt_sequential = time.perf_counter() - t0_sequential
 
+    for result in results:
+        assert result == expected_result  # type: ignore[comparison-overlap]
+
+    def place_result_in_list(i: int, s: str) -> None:
+        results[i] = yake.get_n_best(s, n=1)
+
+    results = [[]] * len(texts)
     threads: list[threading.Thread] = []
-    for text in texts:
+    for index, text in enumerate(texts):
         threads.append(
             threading.Thread(
-                target=yake.get_n_best,
-                args=(text,),
-                kwargs={"n": 1},
+                target=place_result_in_list,
+                args=(index, text),
             )
         )
     t0_concurrent = time.perf_counter()
@@ -178,6 +186,9 @@ def test_get_n_best__concurrency() -> None:
     for thread in threads:
         thread.join()
     dt_concurrent = time.perf_counter() - t0_concurrent
+
+    for result in results:
+        assert result == expected_result  # type: ignore[comparison-overlap]
 
     # If the threads could run truly concurrently, it should have been significantly
     # faster than doing the same work concurrently (assuming multiple cpus):

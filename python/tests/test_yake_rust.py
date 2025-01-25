@@ -6,7 +6,6 @@ import multiprocessing
 import threading
 import time
 from typing import Any
-from unittest.mock import Mock
 
 import pytest
 import yake as liaad_yake
@@ -15,22 +14,12 @@ from flaky import flaky
 import yake_rust
 
 
-@pytest.fixture
-def mock_rust_function(monkeypatch: pytest.MonkeyPatch) -> Mock:
-    mock_obj = Mock(spec=yake_rust._interface._get_n_best__rust)  # type: ignore[attr-defined]
-    monkeypatch.setattr(
-        "yake_rust._interface._get_n_best__rust",
-        mock_obj,
-    )
-    return mock_obj
+def test_instantiate_yake_with_language() -> None:
+    _ = yake_rust.Yake(language="en")
 
 
-def test_instantiate_yake_with_language__unit() -> None:
-    _ = yake_rust.Yake(yake_rust.YakeConfig(), language="en")
-
-
-def test_instantiate_yake_with_custom_stopwords__unit() -> None:
-    _ = yake_rust.Yake(yake_rust.YakeConfig(), stopwords={"stop", "word"})
+def test_instantiate_yake_with_custom_stopwords() -> None:
+    _ = yake_rust.Yake(stopwords={"stop", "word"})
 
 
 @pytest.mark.parametrize(
@@ -40,79 +29,22 @@ def test_instantiate_yake_with_custom_stopwords__unit() -> None:
 )
 def test_instantiate_yake_bad_arguments(kwargs: dict[str, Any]) -> None:
     with pytest.raises(TypeError):
-        _ = yake_rust.Yake(yake_rust.YakeConfig(), **kwargs)
+        _ = yake_rust.Yake(**kwargs)
 
 
-def test_get_n_best_with_stopwords__unit(mock_rust_function: Mock) -> None:
-    """Test get_n_best with the rust crate yake-rust mocked."""
-    text = "this is a text"
-    n = 2
-    stopwords = {"stop"}
-    config = Mock(spec=yake_rust.YakeConfig)
-
-    actual = yake_rust.Yake(config, stopwords=stopwords).get_n_best(
-        text,
-        n=n,
-    )
-    mock_rust_function.assert_called_once_with(
-        text,
-        n,
-        config.ngrams,
-        config.punctuation,
-        config.window_size,
-        config.remove_duplicates,
-        config.deduplication_threshold,
-        config.strict_capital,
-        config.only_alphanumeric_and_hyphen,
-        config.minimum_chars,
-        stopwords,
-        None,
-    )
-    assert actual is mock_rust_function.return_value
-
-
-def test_get_n_best_with_language__unit(mock_rust_function: Mock) -> None:
-    """Test get_n_best with the rust crate yake-rust mocked."""
-    text = "this is a text"
-    n = 2
-    language = "pt"
-    config = Mock(spec=yake_rust.YakeConfig)
-
-    actual = yake_rust.Yake(config, language=language).get_n_best(
-        text,
-        n=n,
-    )
-    mock_rust_function.assert_called_once_with(
-        text,
-        n,
-        config.ngrams,
-        config.punctuation,
-        config.window_size,
-        config.remove_duplicates,
-        config.deduplication_threshold,
-        config.strict_capital,
-        config.only_alphanumeric_and_hyphen,
-        config.minimum_chars,
-        None,
-        language,
-    )
-    assert actual is mock_rust_function.return_value
-
-
-@pytest.mark.integration_test
 @pytest.mark.parametrize(
-    ("text", "n", "config", "expected"),
+    ("text", "n", "kwargs", "expected"),
     [
         (
             "This is a keyword!",
             2,
-            yake_rust.YakeConfig(),
+            {"language": "en"},
             [("keyword", pytest.approx(0.1583, abs=0.001))],
         ),
         (
             "I will give you a great deal if you just read this.",
             2,
-            yake_rust.YakeConfig(ngrams=2),
+            {"ngrams": 2, "language": "en"},
             [
                 ("great deal", pytest.approx(0.0257, abs=0.001)),
                 ("give", pytest.approx(0.1583, abs=0.001)),
@@ -123,19 +55,19 @@ def test_get_n_best_with_language__unit(mock_rust_function: Mock) -> None:
             "Good headphones? Like, really good headphones? "
             "I am a headphones salesperson!",
             1,
-            yake_rust.YakeConfig(ngrams=1),
+            {"ngrams": 1, "language": "en"},
             [("headphones", pytest.approx(0.1694, abs=0.001))],
         ),
     ],
 )
-def test_get_n_best__integration(
+def test_get_n_best(
     text: str,
     n: int,
-    config: yake_rust.YakeConfig,
+    kwargs: dict[str, Any],
     expected: list[tuple[str, float]],
 ) -> None:
     """Test get_n_best with the underlying rust crate yake-rust."""
-    actual = yake_rust.Yake(config, language="en").get_n_best(
+    actual = yake_rust.Yake(**kwargs).get_n_best(
         text,
         n=n,
     )
@@ -185,12 +117,9 @@ def test_get_n_best__compare_with_liaad_yake(text: str, n: int, ngrams: int) -> 
         (t[0], float(t[1])) for t in liaad_result
     ]  # LIAAD/yake returns np.float64
 
-    config = yake_rust.YakeConfig(
-        ngrams=ngrams,
-    )
     our_yake = yake_rust.Yake(
-        config,
-        stopwords=liaad_extractor.stopword_set,  # use LIAAD/yake stopwords)
+        ngrams=ngrams,
+        stopwords=liaad_extractor.stopword_set,  # use LIAAD/yake stopwords
     )
     our_result: list[tuple[str, float]] = our_yake.get_n_best(
         text,
@@ -219,10 +148,7 @@ LONG_TEXT = (
 ) * 20
 
 
-@pytest.mark.slow_integration_test
-@flaky(  # type: ignore[misc]
-    max_runs=10, min_passes=1
-)  # If it passes even once, it must have been concurrent
+@pytest.mark.integration_test
 def test_get_n_best__concurrency() -> None:
     """Test that keyword extraction can be concurrent (releases the GIL)."""
     if multiprocessing.cpu_count() < 2:
@@ -230,8 +156,7 @@ def test_get_n_best__concurrency() -> None:
 
     # Long text to make it slow
     texts = [LONG_TEXT] * 4
-    config = yake_rust.YakeConfig(window_size=2)
-    yake = yake_rust.Yake(config, language="en")
+    yake = yake_rust.Yake(ngrams=3, window_size=2, language="en")
 
     t0_sequential = time.perf_counter()
     for text in texts:
@@ -270,13 +195,10 @@ def _run_yake_rust_and_liaad_yake(
         windowsSize=window_size,
         top=n,
     )
-    config = yake_rust.YakeConfig(
+    yake_rust_extractor = yake_rust.Yake(
         ngrams=ngrams,
         remove_duplicates=True,  # always True for LIAAD/yake
         window_size=window_size,
-    )
-    yake_rust_extractor = yake_rust.Yake(
-        config,
         stopwords=liaad_extractor.stopword_set,  # use LIAAD/yake stopwords
     )
 
@@ -306,7 +228,7 @@ def test_get_n_best__race_liaad_yake__short_text() -> None:
 
 
 @pytest.mark.slow_integration_test
-@flaky(max_runs=10, min_passes=6)  # type: ignore[misc]
+@flaky(max_runs=10, min_passes=8)  # type: ignore[misc]
 def test_get_n_best__race_liaad_yake__long_text() -> None:
     dt_liaad, dt_rust = _run_yake_rust_and_liaad_yake(
         LONG_TEXT,

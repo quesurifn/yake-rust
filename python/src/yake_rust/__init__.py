@@ -1,8 +1,5 @@
 """Python interface to yake-rust."""
 
-from ._interface import Yake, YakeConfig
+from ._lib import Yake
 
-__all__ = (
-    "Yake",
-    "YakeConfig",
-)
+__all__ = ("Yake",)

@@ -1,0 +1,7 @@
+pytest>=7.0
+pytest-cov
+pytest-integration
+flaky
+mypy
+ruff>=0.1.2
+yake

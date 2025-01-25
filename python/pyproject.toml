@@ -1,0 +1,138 @@
+[build-system]
+requires = ["maturin>=1.8,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "yake-rust"
+dynamic = ["version"]
+description = "Python bindings for the yake-rust crate."
+authors = [
+  {name="Anton Vikström"},
+  {name="Kyle Fahey"}, 
+  {name="Igor Strebz"},
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Rust",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: Text Processing",
+  "Topic :: Text Processing :: Linguistic",
+]
+requires-python = ">=3.9"
+dependencies = []
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "yake_rust._lib"
+python-source = "src"
+python-packages = ["yake_rust"]
+
+[tool.ruff]
+src = ["src", "tests"]
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle
+  "F",   # pyflakes
+  "UP",  # pyupgrade
+  "D",   # pydocstyle
+  "PT",  # flake8-pytest-style
+  "I",   # isort
+  "RUF", # Ruff-specific rules
+  "PTH", # flake8-use-pathlib
+  "ERA", # eradicate
+  "PL",  # pylint
+  "FBT", # flake8-boolean-trap
+  "B",   # flake8-bugbear
+  "A",   # flake8-builtins
+  "ISC", # flake8-implicit-str-concat
+  "INP", # flake8-no-pep420
+  "SLF", # flake8-self
+  "SIM", # flake8-simplify
+  "TID", # flake8-tidy-imports
+  "ARG", # flake8-unused-arguments
+  "TRY", # tryceratops
+  "FLY",  # flynt
+  "RSE",  # flake8-raise
+  "RET",  # flake8-return
+  "FIX",  # flake8-fixme
+  "Q",    # flake8-quotes
+  "C4",   # flake8-comprehensions
+  "DTZ",  # flake8-datetimez
+  "T10",  # flake8-debugger
+  "T20",  # flake8-print
+  "TCH",  # flake8-type-checking
+]
+ignore = [
+  "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107", "D203", "D211", "D212",
+  "PTH123",
+  "TRY003", "TRY301",
+  "PLR2004",
+  "FBT002",
+  "ISC001",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+  "FBT001",
+  "SLF001",
+  "PLR2004", "PLR0913",
+  "ARG001", "ARG002", "ARG004",
+  "T201",
+]
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = false
+mark-parentheses = false
+parametrize-names-type = "tuple"
+parametrize-values-type = "list"
+
+[tool.mypy]
+pretty = true
+files = ["src/**/*.py", "tests/**/*.py"]
+exclude = ["venv", ".venv"]
+warn_no_return = true
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+no_implicit_reexport = true
+strict_equality = true
+extra_checks = true
+
+[[tool.mypy.overrides]]
+module = "yake"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "flaky.*"
+ignore_missing_imports = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 100
+
+[tool.pytest.ini_options]
+addopts = "--cov='yake_rust' -vv --no-flaky-report"
+minversion = "7.0"
+testpaths = ["tests"]

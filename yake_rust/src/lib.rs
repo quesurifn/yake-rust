@@ -603,7 +603,7 @@ impl Yake {
     }
 
     fn word_is_punctuation(&self, word: impl AsRef<str>) -> bool {
-        HashSet::from_iter(word.as_ref().chars()).is_subset(&self.config.punctuation)
+        word.as_ref().chars().all(|c| self.config.punctuation.contains(&c))
     }
 }
 

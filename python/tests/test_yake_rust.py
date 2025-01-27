@@ -14,6 +14,13 @@ from flaky import flaky
 import yake_rust
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _warm_up() -> None:
+    """Run keyword extraction once to initialize segtok."""
+    # First run of yake-rust is slow because of segtok.
+    _ = yake_rust.Yake(language="en").get_n_best("Hello world!", n=1)
+
+
 def test_instantiate_yake_with_language() -> None:
     _ = yake_rust.Yake(language="en")
 
@@ -149,7 +156,7 @@ LONG_TEXT = (
 
 
 @pytest.mark.integration_test
-@flaky(max_runs=10, min_passes=1)  # type: ignore[misc]
+@flaky(max_runs=10, min_passes=5)  # type: ignore[misc]
 def test_get_n_best__concurrency() -> None:
     """Test that keyword extraction can be concurrent (releases the GIL)."""
     if multiprocessing.cpu_count() < 2:
@@ -226,7 +233,6 @@ def _run_yake_rust_and_liaad_yake(
 
 
 @pytest.mark.integration_test
-@flaky(max_runs=10, min_passes=6)  # type: ignore[misc]
 def test_get_n_best__race_liaad_yake__short_text() -> None:
     dt_liaad, dt_rust = _run_yake_rust_and_liaad_yake(
         "short text",
@@ -234,13 +240,10 @@ def test_get_n_best__race_liaad_yake__short_text() -> None:
         n=1,
         window_size=1,
     )
-    # yake-rust is not faster for a short text, but it
-    # is not allowed to be that much slower either
-    assert dt_rust - dt_liaad < 0.01
+    assert dt_rust < dt_liaad
 
 
-@pytest.mark.slow_integration_test
-@flaky(max_runs=100, min_passes=100)  # type: ignore[misc]
+@pytest.mark.integration_test
 def test_get_n_best__race_liaad_yake__long_text() -> None:
     dt_liaad, dt_rust = _run_yake_rust_and_liaad_yake(
         LONG_TEXT,

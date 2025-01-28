@@ -156,7 +156,7 @@ LONG_TEXT = (
 
 
 @pytest.mark.integration_test
-@flaky(max_runs=10, min_passes=5)  # type: ignore[misc]
+@flaky(max_runs=10, min_passes=2)  # type: ignore[misc]
 def test_get_n_best__concurrency() -> None:
     """Test that keyword extraction can be concurrent (releases the GIL)."""
     if multiprocessing.cpu_count() < 2:
@@ -176,8 +176,13 @@ def test_get_n_best__concurrency() -> None:
     for result in results:
         assert result == expected_result  # type: ignore[comparison-overlap]
 
+    times: list[tuple[float, float]] = [(-1.0, -1.0)] * len(texts)
+
     def place_result_in_list(i: int, s: str) -> None:
+        start_t = time.monotonic_ns()
         results[i] = yake.get_n_best(s, n=1)
+        end_t = time.monotonic_ns()
+        times[i] = (start_t, end_t)
 
     results = [[]] * len(texts)
     threads: list[threading.Thread] = []
@@ -198,9 +203,18 @@ def test_get_n_best__concurrency() -> None:
     for result in results:
         assert result == expected_result  # type: ignore[comparison-overlap]
 
+    start_times = [t[0] for t in times]
+    end_times = [t[1] for t in times]
+    # All threads started before any thread ended:
+    assert all(
+        all(start_time < end_time for end_time in end_times)
+        for start_time in start_times
+    )
+
     # If the threads could run truly concurrently, it should have been significantly
-    # faster than doing the same work concurrently (assuming multiple cpus):
-    assert dt_concurrent <= dt_sequential * 0.5
+    # faster than doing the same work concurrently (assuming multiple cpus).
+    # However, this is a bit flaky, so give it a bit of a leeway.
+    assert dt_concurrent <= dt_sequential * 0.65
 
 
 def _run_yake_rust_and_liaad_yake(

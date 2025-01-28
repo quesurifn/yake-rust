@@ -55,14 +55,14 @@ impl Yake {
     ///
     /// Get the n best keywords from text.
     #[pyo3(signature = (text, *, n))]
-    pub fn get_n_best(&self, py: Python, text: String, n: usize) -> Vec<(String, f64)> {
+    pub fn get_n_best(&self, py: Python, text: &str, n: usize) -> Vec<(String, f64)> {
         py.allow_threads(|| get_n_best_sequential(n, text, &self._stopwords, &self._config))
     }
 }
 
 fn get_n_best_sequential(
     n: usize,
-    text: String,
+    text: &str,
     stopwords: &yake_rust::StopWords,
     config: &yake_rust::Config,
 ) -> Vec<(String, f64)> {

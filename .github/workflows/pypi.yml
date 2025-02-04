@@ -188,4 +188,4 @@ jobs:
         with:
           command: upload
           # Using test.pypi until confirmed to work:
-          args: --non-interactive --skip-existing wheels-*/* --repository-url https://test.pypi.org/legacy/
+          args: --non-interactive --repository testpypi --skip-existing wheels-*/*

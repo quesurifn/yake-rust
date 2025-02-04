@@ -7,10 +7,8 @@ pub trait PluralHelper {
 
 impl<'a> PluralHelper for &'a str {
     fn to_single(self) -> &'a str {
-        if self.chars().count() > 3 && (self.ends_with(['s', 'S'])) {
-            let mut chars = self.chars();
-            chars.next_back();
-            chars.as_str()
+        if self.chars().take(4).count() > 3 && (self.ends_with(['s', 'S'])) {
+            &self[0..self.len() - 1]
         } else {
             self
         }

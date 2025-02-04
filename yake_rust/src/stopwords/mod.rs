@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 
 use crate::LTerm;
@@ -11,13 +10,13 @@ use crate::LTerm;
 /// Tokens with fewer than three characters are also considered a stopword.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct StopWords {
-    set: HashSet<LTerm>,
+    set: hashbrown::HashSet<LTerm>,
 }
 
 impl StopWords {
     /// Use the passed set of lowercased strings as stopwords.
-    pub fn custom(lowercased: HashSet<LTerm>) -> Self {
-        StopWords { set: lowercased }
+    pub fn custom(lowercased: std::collections::HashSet<LTerm>) -> Self {
+        Self::from(lowercased)
     }
 
     /// Load a predefined list of stopwords for the language given as argument.
@@ -106,8 +105,20 @@ impl StopWords {
     }
 }
 
+impl From<hashbrown::HashSet<LTerm>> for StopWords {
+    fn from(lowercased: hashbrown::HashSet<LTerm>) -> Self {
+        Self { set: lowercased.into_iter().collect() }
+    }
+}
+
+impl From<std::collections::HashSet<LTerm>> for StopWords {
+    fn from(lowercased: std::collections::HashSet<LTerm>) -> Self {
+        Self { set: lowercased.into_iter().collect() }
+    }
+}
+
 impl Deref for StopWords {
-    type Target = HashSet<LTerm>;
+    type Target = hashbrown::HashSet<LTerm>;
 
     fn deref(&self) -> &Self::Target {
         &self.set

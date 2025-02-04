@@ -1,5 +1,6 @@
-use std::collections::HashSet;
 use std::hash::Hash;
+
+use hashbrown::HashSet;
 
 pub struct Counter<K> {
     list: Vec<K>,

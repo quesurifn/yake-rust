@@ -7,9 +7,10 @@
 #![warn(missing_docs)]
 #![allow(clippy::needless_doctest_main)]
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::iter::FromIterator;
 
+use hashbrown::{HashMap, HashSet};
 use indexmap::{IndexMap, IndexSet};
 use plural_helper::PluralHelper;
 use preprocessor::{split_into_sentences, split_into_words};
@@ -163,7 +164,7 @@ pub struct Config {
     /// List of punctuation symbols.
     ///
     /// They are known as _exclude chars_ in the [original implementation](https://github.com/LIAAD/yake).
-    pub punctuation: HashSet<char>,
+    pub punctuation: std::collections::HashSet<char>,
 
     /// The number of tokens both preceding and following a term to calculate _term dispersion_ metric.
     pub window_size: usize,
@@ -600,7 +601,7 @@ impl Yake {
     }
 
     fn word_has_multiple_punctuation_symbols(&self, word: impl AsRef<str>) -> bool {
-        HashSet::from_iter(word.as_ref().chars()).intersection(&self.config.punctuation).count() > 1
+        std::collections::HashSet::from_iter(word.as_ref().chars()).intersection(&self.config.punctuation).count() > 1
     }
 
     fn word_is_punctuation(&self, word: impl AsRef<str>) -> bool {

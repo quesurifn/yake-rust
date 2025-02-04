@@ -1,18 +1,14 @@
 # YAKE (Yet Another Keyword Extractor) [![](https://img.shields.io/crates/v/yake-rust.svg)](https://crates.io/crates/yake-rust) [![](https://docs.rs/yake-rust/badge.svg)](https://docs.rs/yake-rust/)
 
-Yake is a language agnostic statistical keyword extractor weighing several factors such as acronyms, position in
-paragraph, capitalization, how many sentences the keyword appears in, stopwords, punctuation and more. Details are in
-these papers: [brief](https://repositorio.inesctec.pt/server/api/core/bitstreams/ef121a01-a0a6-4be8-945d-3324a58fc944/content),
-[extended](https://doi.org/10.1016/j.ins.2019.09.013).
-
-This crate is ported and is as close as possible to the [reference implementation](https://github.com/LIAAD/yake/).
-The input text is split into sentences and tokens via the [segtok](https://github.com/xamgore/segtok) crate.
+Yake is a statistical keyword extractor. It weighs several factors such as acronyms, position in
+paragraph, capitalization, how many sentences the keyword appears in, stopwords, punctuation and more.
 
 ## How it works
 
 For Yake ✨keyphrase✨ is an n-gram (1-, 2-, 3-) not starting nor ending in a stopword, not having numbers and punctuation inside, without long and short terms, etc.
 
-Yake assigns an importance score to each term in the text. The lower the score, the more important the term.
+The input text is split into sentences and terms via the [segtok](https://github.com/xamgore/segtok) crate.
+Yake assigns an importance score to each term in the text.
 
 Eventually, the most important terms:
 - occur more frequently
@@ -42,7 +38,7 @@ fn main() {
 ```
 
 ## Features
-By default, stopwords for all languages are included. However, you can choose to include only specific ones by doing the following:
+By default, stopwords for all languages are included. However, you can choose to include only specific ones:
 
 ```toml
 [dependencies]

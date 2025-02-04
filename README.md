@@ -1,30 +1,14 @@
 # YAKE (Yet Another Keyword Extractor) [![](https://img.shields.io/crates/v/yake-rust.svg)](https://crates.io/crates/yake-rust) [![](https://docs.rs/yake-rust/badge.svg)](https://docs.rs/yake-rust/)
 
-Yake is a language agnostic statistical keyword extractor weighing several factors such as acronyms, position in
-paragraph, capitalization, how many sentences the keyword appears in, stopwords, punctuation and more. Details are in
-these papers: [brief](https://repositorio.inesctec.pt/server/api/core/bitstreams/ef121a01-a0a6-4be8-945d-3324a58fc944/content),
-[extended](https://doi.org/10.1016/j.ins.2019.09.013).
-
-This crate is ported and is as close as possible to the [reference implementation](https://github.com/LIAAD/yake/).
-The input text is split into sentences and tokens via the [segtok](https://github.com/xamgore/segtok) crate.
+Yake is a statistical keyword extractor. It weighs several factors such as acronyms, position in
+paragraph, capitalization, how many sentences the keyword appears in, stopwords, punctuation and more.
 
 ## How it works
 
 For Yake ✨keyphrase✨ is an n-gram (1-, 2-, 3-) not starting nor ending in a stopword, not having numbers and punctuation inside, without long and short terms, etc.
 
-Yake assigns an importance score $\mathbf{T}\_\text{Score}$ to each term in the text. The lower the score, the more important the term.
-
-$$
-\begin{flalign}
-& \mathbf{T}\_\text{NormedFreq} &&=&& \frac{ \text{frequency of } \text{term }\mathbf{T} }{\text{mean}\\,\bigl(\\,\text{frequency of term }\mathbb{T} | \forall\\, \mathbb{T} \notin SW\\, \bigr) + 1 \sigma }  \\
-& \mathbf{T}\_\text{Casing} &&=&& \frac{\text{frequency of term }\mathbf{T}\text{ written as 'TERM'} }{\ln \bigl(\\, \text{frequency of term }\mathbf{T}\\,\bigr)}  \\
-& \mathbf{T}\_\text{\\%Sentences} &&=&& \dfrac{ |S| }{ \text{\\# of sentences } }, \text{ where } S = \\{\\, i\\, |\\, \text{term }\mathbf{T} \in \text{sentence}_i\\, \\} \\
-& \mathbf{T}\_\text{Relatedness} &&=&& 1 + (\mathbf{T}\_\text{LDiversity} + \mathbf{T}\_\text{RDiversity}) * \frac{ \text{frequency of } \text{term }\mathbf{T} }{\max\bigl(\text{ frequency of term }\mathbb{T} | \forall\\, \mathbb{T} \\, \bigr) } \\
-& \mathbf{T}\_\text{Position} &&=&& \overset{\ } \ln ( \ln (\\, 3 + \text{median}(S) \\,) ), \text{ where } S = \\{\\, i\\, |\\, \text{term }\mathbf{T} \in \text{sentence}_i\\, \\} \\
-& \mathbf{T}\_\text{Score} &&=&& \dfrac{ {\mathbf{T}\_\text{Relatedness}}^2 * \mathbf{T}\_\text{Position} \quad \quad \quad \quad \quad \quad \quad \quad \quad \quad \quad }{ \mathbf{T}\_\text{Relatedness} \ * \mathbf{T}\_\text{Casing} + \mathbf{T}\_\text{NormedFreq} + \mathbf{T}\_\text{\\%Sentences} } \\
-& \mathcal{K}\_\text{Score} &&=&& \frac{\prod\_{\mathbf{T} \in \mathcal{K}} \mathbf{T}\_\text{Score}}{\text{frequency of keyword }\mathcal{K} * (1 + \sum\_{\mathbf{T} \in \mathcal{K}} \mathbf{T}\_\text{Score})}
-\end{flalign}
-$$
+The input text is split into sentences and terms via the [segtok](https://github.com/xamgore/segtok) crate.
+Yake assigns an importance score to each term in the text.
 
 Eventually, the most important terms:
 - occur more frequently
@@ -79,7 +63,7 @@ fn main() {
 > **Google** chief economist Hal Varian, Khosla Ventures and Yuri Milner
 </details>
 
-| score | top 10 keywords            |
+| Score | Top 10 keywords            |
 |------:|:---------------------------|
 | 0.025 | Google                     |
 | 0.027 | Kaggle                     |
@@ -91,3 +75,24 @@ fn main() {
 | 0.091 | San Francisco              |
 | 0.097 | Anthony Goldbloom declined |
 | 0.098 | science                    |
+
+
+## Features
+By default, stopwords for all languages are included. However, you can choose to include only specific ones:
+
+```toml
+[dependencies]
+yake-rust = { version = "*", default-features = false, features = ["en", "de"] }
+```
+
+## Credits
+
+This Rust crate implements the algorithm described in papers
+([brief](https://web.archive.org/web/20240418035141/https://repositorio.inesctec.pt/server/api/core/bitstreams/ef121a01-a0a6-4be8-945d-3324a58fc944/content),
+[extended](https://doi.org/10.1016/j.ins.2019.09.013)) and was inspired by
+the Python package [yake](https://github.com/LIAAD/yake/), originally developed by
+Ricardo Campos, Vitor Mangaravite, Arian Pasquali, Alípio Jorge.
+
+- [Kyle Fahey](https://github.com/quesurifn) — implemented the first draft
+- [Anton Vikström](https://github.com/bunny-therapist) — reached 1-1 score alignment with official package
+- [Igor Strebz](https://github.com/xamgore) — rewritten and heavily optimized the code

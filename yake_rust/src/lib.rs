@@ -5,6 +5,7 @@
 #![deny(rustdoc::private_intra_doc_links)]
 #![deny(unused_imports)]
 #![warn(missing_docs)]
+#![allow(clippy::needless_doctest_main)]
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;

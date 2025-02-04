@@ -1,27 +1,26 @@
 use std::hint::black_box;
 use std::io::{Cursor, Read};
 
-use divan::{AllocProfiler, Bencher};
-use yake_rust::{Config, StopWords, Yake};
+use divan::Bencher;
+use yake_rust::{get_n_best, Config, StopWords};
 use zip::ZipArchive;
 
-#[global_allocator]
-static ALLOC: AllocProfiler = AllocProfiler::system();
+// #[global_allocator]
+// static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
 
 fn main() {
     // Run registered benchmarks.
     divan::main();
 }
 
-#[divan::bench(ignore)]
+#[divan::bench]
 fn text_100kb(bencher: Bencher) {
     let text = include_str!("100kb.txt");
     let stopwords = StopWords::predefined("en").unwrap();
     let config = Config { remove_duplicates: false, ..Default::default() };
-    let yake = Yake::new(stopwords, config);
 
     bencher.bench_local(move || {
-        black_box(yake.get_n_best(black_box(text), None));
+        black_box(get_n_best(usize::MAX, black_box(text), black_box(&stopwords), black_box(&config)));
     });
 }
 
@@ -30,10 +29,22 @@ fn text_3kb(bencher: Bencher) {
     let text = include_str!("3kb.txt");
     let stopwords = StopWords::predefined("en").unwrap();
     let config = Config { remove_duplicates: false, ..Default::default() };
-    let yake = Yake::new(stopwords, config);
 
     bencher.bench_local(move || {
-        black_box(yake.get_n_best(black_box(text), None));
+        black_box(get_n_best(usize::MAX, black_box(text), black_box(&stopwords), black_box(&config)));
+    });
+}
+
+#[divan::bench(min_time = 10)]
+fn text_170b(bencher: Bencher) {
+    let text = "Do you like headphones? \
+            Starting this Saturday, we will be kicking off a huge sale of headphones! \
+            If you need headphones, we've got you covered!";
+    let stopwords = StopWords::predefined("en").unwrap();
+    let config = Config { remove_duplicates: false, ..Default::default() };
+
+    bencher.bench_local(move || {
+        black_box(get_n_best(usize::MAX, black_box(text), black_box(&stopwords), black_box(&config)));
     });
 }
 

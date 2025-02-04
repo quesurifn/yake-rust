@@ -127,12 +127,6 @@ jobs:
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
-        python-version-minor:
-          - '9'
-          - '10'
-          - '11'
-          - '12'
-          - '13'
         platform:
           - runner: macos-13
             target: x86_64
@@ -142,18 +136,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version-minor }}
+          python-version: 3.x
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           command: build
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --interpreter python3.${{ matrix.python-version-minor }} --manifest-path ./python/Cargo.toml
+          args: --release --out dist --find-interpreter --manifest-path ./python/Cargo.toml
           sccache: 'true'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-macos-${{ matrix.platform.target }}-cp3${{ matrix.python-version-minor }}
+          name: wheels-macos-${{ matrix.platform.target }}
           path: dist
 
   sdist:

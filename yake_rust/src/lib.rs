@@ -353,9 +353,9 @@ impl Yake {
     /// Unparsable.
     fn is_u_tagged(&self, word: &str) -> bool {
         self.word_has_multiple_punctuation_symbols(word) || {
-            let nr_of_digits = word.chars().filter(|w| w.is_ascii_digit()).count();
-            let nr_of_alphas = word.chars().filter(|w| w.is_alphabetic()).count();
-            (nr_of_alphas > 0 && nr_of_digits > 0) || (nr_of_alphas == 0 && nr_of_digits == 0)
+            let has_digits = word.chars().any(|w| w.is_ascii_digit());
+            let has_alphas = word.chars().any(|w| w.is_alphabetic());
+            (has_alphas && has_digits) || (!has_alphas && !has_digits)
         }
     }
 

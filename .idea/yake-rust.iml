@@ -5,6 +5,8 @@
       <sourceFolder url="file://$MODULE_DIR$/yake_rust/benches" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/yake_rust/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/yake_rust/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/python/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/python/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

@@ -185,7 +185,8 @@ jobs:
           subject-path: 'wheels-*/*'
       - name: Publish to PyPI
         uses: PyO3/maturin-action@v1
+        env:
+          MATURIN_REPOSITORY: testpypi
         with:
           command: upload
-          # Using test.pypi until confirmed to work:
-          args: --non-interactive --repository testpypi --skip-existing wheels-*/*
+          args: --non-interactive --skip-existing wheels-*/*

@@ -94,5 +94,5 @@ the Python package [yake](https://github.com/LIAAD/yake/), originally developed 
 Ricardo Campos, Vitor Mangaravite, Arian Pasquali, Alípio Jorge.
 
 - [Kyle Fahey](https://github.com/quesurifn) — implemented the first draft
-- [Anton Vikström](https://github.com/bunny-therapist) — reached 1-1 score alignment with official package
+- [Anton Vikström](https://github.com/bunny-therapist) — reached 1-1 score alignment with the original package
 - [Igor Strebz](https://github.com/xamgore) — rewritten and heavily optimized the code

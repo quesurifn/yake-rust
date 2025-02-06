@@ -1117,6 +1117,7 @@ dependencies = [
  "divan",
  "hashbrown 0.15.2",
  "indexmap 2.7.1",
+ "itertools",
  "levenshtein",
  "pretty_assertions",
  "regex",

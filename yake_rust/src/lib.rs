@@ -12,6 +12,7 @@ use std::iter::FromIterator;
 
 use hashbrown::{HashMap, HashSet};
 use indexmap::{IndexMap, IndexSet};
+use itertools::Itertools;
 use plural_helper::PluralHelper;
 use preprocessor::{split_into_sentences, split_into_words};
 use stats::{mean, median, stddev};
@@ -416,11 +417,11 @@ impl Yake {
                 // Our assumption is that terms that occur in the early
                 // sentences of a text should be more highly valued than terms that appear later. Thus,
                 // instead of considering a uniform distribution of terms, our model assigns higher
-                // scores to terms found in early sentences. todo: optimize space, dedup sorted indexes
-                let sentence_ids: HashSet<_> = occurrences.iter().map(|o| o.idx).collect();
+                // scores to terms found in early sentences.
+                let sentence_ids = occurrences.iter().map(|o| o.idx).dedup();
                 // When the candidate term only appears in the first sentence, the median function
                 // can return a value of 0. To guarantee position > 0, a constant 3 > e=2.71 is added.
-                stats.position = 3.0 + median(sentence_ids.into_iter()).unwrap();
+                stats.position = 3.0 + median(sentence_ids).unwrap();
                 // A double log is applied in order to smooth the difference between terms that occur
                 // with a large median difference.
                 stats.position = stats.position.ln().ln();
@@ -443,8 +444,8 @@ impl Yake {
             {
                 // Candidates which appear in many different sentences have a higher probability
                 // of being important.
-                let distinct = occurrences.iter().map(|o| o.idx).collect::<HashSet<_>>();
-                stats.sentences = distinct.len() as f64 / sentences.len() as f64;
+                let distinct = occurrences.iter().map(|o| o.idx).dedup().count();
+                stats.sentences = distinct as f64 / sentences.len() as f64;
             }
 
             stats.score = (stats.relatedness * stats.position)

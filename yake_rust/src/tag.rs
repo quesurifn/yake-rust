@@ -40,12 +40,12 @@ impl Tag {
 }
 
 /// The first symbol is uppercase.
-fn is_capitalized(word: &str) -> bool {
+pub fn is_capitalized(word: &str) -> bool {
     word.chars().next().is_some_and(char::is_uppercase)
 }
 
 /// Only the first symbol is uppercase.
-fn is_strict_capitalized(word: &str) -> bool {
+pub fn is_strict_capitalized(word: &str) -> bool {
     let mut chars = word.chars();
     chars.next().is_some_and(char::is_uppercase) && !chars.any(char::is_uppercase)
 }

@@ -344,31 +344,29 @@ impl Yake {
     /// Computes local statistic features that extract informative content within the text
     /// to calculate the importance of single terms.
     fn extract_features<'s>(&self, ctx: &Contexts, words: Words<'s>, sentences: &'s Sentences) -> Features<'s> {
-        let tf = words.values().map(Vec::len);
-
-        let words_nsw: HashMap<&UTerm, usize> = sentences
+        let candidate_words: IndexSet<_> = sentences
             .iter()
             .flat_map(|sentence| sentence.lc_terms.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation))
-            .filter(|&((lc_term, _), is_punct)| !is_punct && !self.is_stopword(lc_term))
-            .map(|((_, u_term), _)| {
-                let occurrences = words.get(u_term).unwrap().len();
-                (u_term, occurrences)
+            .filter(|&(_, is_punct)| !is_punct)
+            .map(|p| p.0)
+            .collect();
+
+        let words_nsw: HashMap<&UTerm, usize> = candidate_words
+            .iter()
+            .filter(|&(lc, _)| !self.is_stopword(lc))
+            .map(|&(_, uq)| {
+                let occurrences = words.get(uq).unwrap().len();
+                (uq, occurrences)
             })
             .collect();
 
+        let tf = words.values().map(Vec::len);
         let tf_nsw = words_nsw.values().map(|x| *x as f64);
         let std_tf = stddev(tf_nsw.clone());
         let mean_tf = mean(tf_nsw);
         let max_tf = tf.max().unwrap_or(0) as f64;
 
         let mut features = Features::new();
-
-        let candidate_words: IndexSet<_> = sentences
-            .iter()
-            .flat_map(|sentence| sentence.lc_terms.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation))
-            .filter(|&(_, is_punct)| !is_punct)
-            .map(|(pair, _)| pair)
-            .collect();
 
         for (lc_term, u_term) in candidate_words {
             let occurrences = words.get(u_term).unwrap();

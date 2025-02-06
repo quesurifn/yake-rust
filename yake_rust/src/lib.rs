@@ -19,6 +19,7 @@ use stats::{mean, median, stddev};
 use crate::context::Contexts;
 use crate::levenshtein::levenshtein_ratio;
 pub use crate::stopwords::StopWords;
+use crate::tag::*;
 
 mod context;
 mod counter;
@@ -27,6 +28,7 @@ mod plural_helper;
 mod preprocessor;
 mod stopwords;
 
+mod tag;
 #[cfg(test)]
 mod tests;
 
@@ -44,15 +46,6 @@ type Candidates<'s> = IndexMap<&'s [LTerm], Candidate<'s>>;
 type Features<'s> = HashMap<&'s LTerm, TermStats>;
 type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-enum Tag {
-    Digit,
-    Unparsable,
-    Acronym,
-    Uppercase,
-    Parsable,
-}
-
 #[derive(PartialEq, Eq, Hash, Debug)]
 struct Occurrence<'sentence> {
     /// Ordinal number of the word in the source text after splitting into sentences
@@ -62,27 +55,11 @@ struct Occurrence<'sentence> {
     /// Index (0..) of sentence where the term occur
     pub idx: usize,
     /// The word itself
-    pub word: &'sentence String,
+    pub word: &'sentence RawString,
 }
 
 impl Occurrence<'_> {
-    /// USA, USSR, but not B2C.
-    fn _is_acronym(&self) -> bool {
-        self.word.len() > 1 && self.word.chars().all(char::is_uppercase)
-    }
-
-    /// The first symbol is uppercase.
-    fn is_uppercased(&self) -> bool {
-        self.word.chars().next().is_some_and(char::is_uppercase)
-    }
-
-    /// Only the first symbol is uppercase.
-    fn is_capitalized(&self) -> bool {
-        let mut chars = self.word.chars();
-        chars.next().is_some_and(char::is_uppercase) && !chars.any(char::is_uppercase)
-    }
-
-    fn is_first_word(&self) -> bool {
+    fn is_first_word_of_sentence(&self) -> bool {
         self.shift == self.shift_offset
     }
 }
@@ -326,9 +303,9 @@ impl Yake {
                 }
 
                 // Do not store in contexts in any way if the word (not the unique term) is tagged "d" or "u"
-                if !self.is_d_tagged(word) && !self.is_u_tagged(word) {
+                if !Tag::is_numeric(word) && !self.is_unparsable(word) {
                     for &(left_word, left_uterm) in window.iter() {
-                        if self.is_d_tagged(left_word) || self.is_u_tagged(left_word) {
+                        if Tag::is_numeric(left_word) || self.is_unparsable(left_word) {
                             continue;
                         }
 
@@ -346,40 +323,18 @@ impl Yake {
         ctx
     }
 
-    /// Numeric.
-    fn is_d_tagged(&self, word: &str) -> bool {
-        word.replace(",", "").parse::<f64>().is_ok()
-    }
-
-    /// Unparsable.
-    fn is_u_tagged(&self, word: &str) -> bool {
-        self.word_has_multiple_punctuation_symbols(word) || {
-            let has_digits = word.chars().any(|w| w.is_ascii_digit());
-            let has_alphas = word.chars().any(|w| w.is_alphabetic());
-            (has_alphas && has_digits) || (!has_alphas && !has_digits)
-        }
-    }
-
-    /// Acronym.
-    fn is_a_tagged(&self, word: &str) -> bool {
-        word.chars().all(char::is_uppercase)
-    }
-
-    /// Uppercase.
-    fn is_n_tagged(&self, occurrence: &Occurrence) -> bool {
-        let is_capital =
-            if self.config.strict_capital { Occurrence::is_capitalized } else { Occurrence::is_uppercased };
-        is_capital(occurrence) && !occurrence.is_first_word()
+    fn is_unparsable(&self, word: &str) -> bool {
+        Tag::is_unparsable(word, &self.config.punctuation)
     }
 
     fn get_tag(&self, occurrence: &Occurrence) -> Tag {
-        if self.is_d_tagged(occurrence.word) {
+        if Tag::is_numeric(occurrence.word) {
             Tag::Digit
-        } else if self.is_u_tagged(occurrence.word) {
+        } else if self.is_unparsable(occurrence.word) {
             Tag::Unparsable
-        } else if self.is_a_tagged(occurrence.word) {
+        } else if Tag::is_acronym(occurrence.word) {
             Tag::Acronym
-        } else if self.is_n_tagged(occurrence) {
+        } else if Tag::is_uppercase(self.config.strict_capital, occurrence) {
             Tag::Uppercase
         } else {
             Tag::Parsable
@@ -554,9 +509,9 @@ impl Yake {
     fn is_candidate(&self, lc_terms: &[LTerm]) -> bool {
         let lc_words: HashSet<&LTerm> = HashSet::from_iter(lc_terms);
 
-        let has_float = || lc_words.iter().any(|&w| self.is_d_tagged(w));
+        let has_float = || lc_words.iter().any(Tag::is_numeric);
         let has_stop_word = || self.is_stopword(&lc_terms[0]) || self.is_stopword(lc_terms.last().unwrap());
-        let has_unparsable = || lc_words.iter().any(|&w| self.is_u_tagged(w));
+        let has_unparsable = || lc_words.iter().any(|&w| self.is_unparsable(w));
         let not_enough_symbols =
             || lc_terms.iter().map(|w| w.chars().count()).sum::<usize>() < self.config.minimum_chars;
         let has_non_alphanumeric =
@@ -598,10 +553,6 @@ impl Yake {
         }
 
         candidates
-    }
-
-    fn word_has_multiple_punctuation_symbols(&self, word: impl AsRef<str>) -> bool {
-        std::collections::HashSet::from_iter(word.as_ref().chars()).intersection(&self.config.punctuation).count() > 1
     }
 
     fn word_is_punctuation(&self, word: impl AsRef<str>) -> bool {

@@ -8,7 +8,6 @@
 #![allow(clippy::needless_doctest_main)]
 
 use std::collections::VecDeque;
-use std::iter::FromIterator;
 
 use hashbrown::{HashMap, HashSet};
 use indexmap::{IndexMap, IndexSet};
@@ -506,15 +505,13 @@ impl Yake {
     }
 
     fn is_candidate(&self, lc_terms: &[LTerm]) -> bool {
-        let lc_words: HashSet<&LTerm> = HashSet::from_iter(lc_terms);
-
-        let has_float = || lc_words.iter().any(Tag::is_numeric);
+        let has_float = || lc_terms.iter().any(Tag::is_numeric);
         let has_stop_word = || self.is_stopword(lc_terms.last().unwrap());
-        let has_unparsable = || lc_words.iter().any(|&w| self.is_unparsable(w));
+        let has_unparsable = || lc_terms.iter().any(|w| self.is_unparsable(w));
         let not_enough_symbols =
             || lc_terms.iter().map(|w| w.chars().count()).sum::<usize>() < self.config.minimum_chars;
         let has_non_alphanumeric =
-            || self.config.only_alphanumeric_and_hyphen && !lc_words.iter().all(word_is_alphanumeric_and_hyphen);
+            || self.config.only_alphanumeric_and_hyphen && !lc_terms.iter().all(word_is_alphanumeric_and_hyphen);
 
         !{ has_float() || has_stop_word() || has_unparsable() || not_enough_symbols() || has_non_alphanumeric() }
     }

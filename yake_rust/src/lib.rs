@@ -509,7 +509,7 @@ impl Yake {
         let lc_words: HashSet<&LTerm> = HashSet::from_iter(lc_terms);
 
         let has_float = || lc_words.iter().any(Tag::is_numeric);
-        let has_stop_word = || self.is_stopword(&lc_terms[0]) || self.is_stopword(lc_terms.last().unwrap());
+        let has_stop_word = || self.is_stopword(lc_terms.last().unwrap());
         let has_unparsable = || lc_words.iter().any(|&w| self.is_unparsable(w));
         let not_enough_symbols =
             || lc_terms.iter().map(|w| w.chars().count()).sum::<usize>() < self.config.minimum_chars;
@@ -537,6 +537,10 @@ impl Yake {
                     if ignored.contains(lc_terms) {
                         continue;
                     }
+                    if self.is_stopword(&lc_terms[0]) {
+                        break; // all further n-grams starting with this word can't be candidates
+                    }
+
                     // todo: optimize: if some checks have failed, we may skip ngrams, by j += k
                     if !self.is_candidate(lc_terms) {
                         ignored.insert(lc_terms);

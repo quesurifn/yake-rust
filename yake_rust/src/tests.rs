@@ -11,8 +11,13 @@ fn test<const T: usize>(text: &str, lang: &str, cfg: Config, n_best: usize, expe
 }
 
 #[test]
-fn empty() {
+fn empty_text() {
     test("", "en", Config::default(), 1, []);
+}
+
+#[test]
+fn zero_size_ngram() {
+    test("happy new year", "en", Config { ngrams: 0, ..Default::default() }, 1, []);
 }
 
 #[test]

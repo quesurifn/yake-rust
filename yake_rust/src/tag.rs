@@ -4,14 +4,15 @@ use crate::Occurrence;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Tag {
-    /// `d`
+    /// "d"
     Digit,
-    /// `u`
+    /// "u"
     Unparsable,
-    /// `A`
+    /// "a"
     Acronym,
-    /// `N`
+    /// "n"
     Uppercase,
+    /// "p"
     Parsable,
 }
 

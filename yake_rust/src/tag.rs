@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 
-use crate::Occurrence;
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Tag {
     /// "d"
     Digit,
@@ -26,9 +24,9 @@ impl Tag {
         word.chars().all(char::is_uppercase)
     }
 
-    pub fn is_uppercase(strict_capital: bool, occurrence: &Occurrence) -> bool {
-        let is_capital = if strict_capital { is_strict_capitalized } else { is_capitalized };
-        !occurrence.is_first_word_of_sentence() && is_capital(occurrence.word)
+    pub fn is_uppercase(strict_capital: bool, word: &str, is_first_word_of_sentence: bool) -> bool {
+        let is_capital: fn(&str) -> bool = if strict_capital { is_strict_capitalized } else { is_capitalized };
+        !is_first_word_of_sentence && is_capital(word)
     }
 
     pub fn is_unparsable(word: &str, punctuation: &HashSet<char>) -> bool {

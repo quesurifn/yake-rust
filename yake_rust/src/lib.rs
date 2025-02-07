@@ -359,7 +359,6 @@ impl Yake {
             };
 
             {
-                // todo: revert back to the code from 5a6e4747, as tags change nothing
                 let tags: Vec<Tag> = occurrences.iter().map(|occ| occ.tag).collect();
                 // We consider the occurrence of acronyms through a heuristic, where all the letters of the word are capitals.
                 stats.tf_a = tags.iter().filter(|&tag| *tag == Tag::Acronym).count() as f64;

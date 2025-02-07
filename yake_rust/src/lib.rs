@@ -49,20 +49,11 @@ type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 struct Occurrence<'sentence> {
-    /// Ordinal number of the word in the source text after splitting into sentences
-    pub shift_offset: usize,
-    /// The total number of words in all previous sentences.
-    pub shift: usize,
     /// Index (0..) of sentence where the term occur
     pub idx: usize,
     /// The word itself
     pub word: &'sentence RawString,
-}
-
-impl Occurrence<'_> {
-    fn is_first_word_of_sentence(&self) -> bool {
-        self.shift == self.shift_offset
-    }
+    pub tag: Tag,
 }
 
 #[derive(Debug, Default)]
@@ -204,8 +195,7 @@ impl Yake {
     fn get_n_best(&self, text: &str, n: usize) -> Vec<ResultItem> {
         let sentences = self.preprocess_text(text);
 
-        let context = self.build_context(&sentences);
-        let vocabulary = self.build_vocabulary(&sentences);
+        let (context, vocabulary) = self.build_context_and_vocabulary(&sentences);
         let features = self.extract_features(&context, vocabulary, &sentences);
 
         let mut ngrams: Candidates = self.ngram_selection(self.config.ngrams, &sentences);
@@ -267,46 +257,37 @@ impl Yake {
             .collect()
     }
 
-    fn build_vocabulary<'s>(&self, sentences: &'s [Sentence]) -> Words<'s> {
+    fn build_context_and_vocabulary<'s>(&self, sentences: &'s [Sentence]) -> (Contexts<'s>, Words<'s>) {
+        let mut ctx = Contexts::default();
         let mut words = Words::new();
 
         for (idx, sentence) in sentences.iter().enumerate() {
-            let shift = sentences[0..idx].iter().map(|s| s.words.len()).sum::<usize>();
+            let mut window: VecDeque<(&UTerm, Tag)> = VecDeque::with_capacity(self.config.window_size + 1);
 
-            for (w_idx, ((word, is_punctuation), index)) in
-                sentence.words.iter().zip(&sentence.is_punctuation).zip(&sentence.uq_terms).enumerate()
-            {
-                if !word.is_empty() && !is_punctuation {
-                    let occurrence = Occurrence { shift_offset: shift + w_idx, idx, word, shift };
-                    words.entry(index).or_default().push(occurrence)
-                }
-            }
-        }
-
-        words
-    }
-
-    /// Builds co-occurrence matrix containing the co-occurrences between
-    /// a given term and its predecessor AND a given term and its subsequent term,
-    /// found within a window of a given size.
-    fn build_context<'s>(&self, sentences: &'s [Sentence]) -> Contexts<'s> {
-        let mut ctx = Contexts::default();
-
-        for sentence in sentences {
-            let mut window: VecDeque<(&String, &UTerm)> = VecDeque::with_capacity(self.config.window_size + 1);
-
-            for ((word, term), &is_punctuation) in
-                sentence.words.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation)
+            for (w_idx, (((word, term), &is_punctuation), index)) in sentence
+                .words
+                .iter()
+                .zip(&sentence.uq_terms)
+                .zip(&sentence.is_punctuation)
+                .zip(&sentence.uq_terms)
+                .enumerate()
             {
                 if is_punctuation {
                     window.clear();
                     continue;
                 }
+                if word.is_empty() {
+                    continue;
+                }
+
+                let tag = self.get_tag(word, w_idx == 0);
+                let occurrence = Occurrence { idx, word, tag };
+                words.entry(index).or_default().push(occurrence);
 
                 // Do not store in contexts in any way if the word (not the unique term) is tagged "d" or "u"
-                if !Tag::is_numeric(word) && !self.is_unparsable(word) {
-                    for &(left_word, left_uterm) in window.iter() {
-                        if Tag::is_numeric(left_word) || self.is_unparsable(left_word) {
+                if tag != Tag::Digit && tag != Tag::Unparsable {
+                    for &(left_uterm, left_tag) in window.iter() {
+                        if left_tag == Tag::Digit || left_tag == Tag::Unparsable {
                             continue;
                         }
 
@@ -317,25 +298,25 @@ impl Yake {
                 if window.len() == self.config.window_size {
                     window.pop_front();
                 }
-                window.push_back((word, term));
+                window.push_back((term, tag.clone()));
             }
         }
 
-        ctx
+        (ctx, words)
     }
 
     fn is_unparsable(&self, word: &str) -> bool {
         Tag::is_unparsable(word, &self.config.punctuation)
     }
 
-    fn get_tag(&self, occurrence: &Occurrence) -> Tag {
-        if Tag::is_numeric(occurrence.word) {
+    fn get_tag(&self, word: &str, is_first_word_of_sentence: bool) -> Tag {
+        if Tag::is_numeric(word) {
             Tag::Digit
-        } else if self.is_unparsable(occurrence.word) {
+        } else if self.is_unparsable(word) {
             Tag::Unparsable
-        } else if Tag::is_acronym(occurrence.word) {
+        } else if Tag::is_acronym(word) {
             Tag::Acronym
-        } else if Tag::is_uppercase(self.config.strict_capital, occurrence) {
+        } else if Tag::is_uppercase(self.config.strict_capital, word, is_first_word_of_sentence) {
             Tag::Uppercase
         } else {
             Tag::Parsable
@@ -380,7 +361,7 @@ impl Yake {
 
             {
                 // todo: revert back to the code from 5a6e4747, as tags change nothing
-                let tags: Vec<Tag> = occurrences.iter().map(|occ| self.get_tag(occ)).collect();
+                let tags: Vec<Tag> = occurrences.iter().map(|occ| occ.tag).collect();
                 // We consider the occurrence of acronyms through a heuristic, where all the letters of the word are capitals.
                 stats.tf_a = tags.iter().filter(|&tag| *tag == Tag::Acronym).count() as f64;
                 // We give extra attention to any term beginning with a capital letter (excluding the beginning of sentences).

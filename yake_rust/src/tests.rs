@@ -237,7 +237,7 @@ mod liaad_yake_samples {
     fn google_sample_single_ngram() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_google.txt"),
+            include_str!("samples/test_google.txt"),
             "en",
             Config { ngrams: 1, ..Default::default() },
             10,
@@ -261,7 +261,7 @@ mod liaad_yake_samples {
     fn google_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_google.txt"),
+            include_str!("samples/test_google.txt"),
             "en",
             Config::default(),
             10,
@@ -285,7 +285,7 @@ mod liaad_yake_samples {
     fn gitter_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_gitter.txt"),
+            include_str!("samples/test_gitter.txt"),
             "en",
             Config::default(),
             10,
@@ -309,7 +309,7 @@ mod liaad_yake_samples {
     fn genius_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_genius.txt"),
+            include_str!("samples/test_genius.txt"),
             "en",
             Config::default(),
             10,
@@ -333,7 +333,7 @@ mod liaad_yake_samples {
     fn german_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_german.txt"),
+            include_str!("samples/test_german.txt"),
             "de",
             Config::default(),
             10,
@@ -374,7 +374,7 @@ mod liaad_yake_samples {
     fn dutch_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_nl.txt"),
+            include_str!("samples/test_nl.txt"),
             "nl",
             Config::default(),
             10,
@@ -398,7 +398,7 @@ mod liaad_yake_samples {
     fn finnish_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_fi.txt"),
+            include_str!("samples/test_fi.txt"),
             "fi",
             Config::default(),
             10,
@@ -422,7 +422,7 @@ mod liaad_yake_samples {
     fn italian_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_it.txt"),
+            include_str!("samples/test_it.txt"),
             "it",
             Config::default(),
             5,
@@ -441,7 +441,7 @@ mod liaad_yake_samples {
     fn french_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_fr.txt"),
+            include_str!("samples/test_fr.txt"),
             "fr",
             Config::default(),
             10,
@@ -465,7 +465,7 @@ mod liaad_yake_samples {
     fn portuguese_sport_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_pt_1.txt"),
+            include_str!("samples/test_pt_1.txt"),
             "pt",
             Config::default(),
             10,
@@ -489,7 +489,7 @@ mod liaad_yake_samples {
     fn portuguese_tourism_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_pt_2.txt"),
+            include_str!("samples/test_pt_2.txt"),
             "pt",
             Config::default(),
             10,
@@ -513,7 +513,7 @@ mod liaad_yake_samples {
     fn spanish_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_es.txt"),
+            include_str!("samples/test_es.txt"),
             "es",
             Config::default(),
             10,
@@ -537,7 +537,7 @@ mod liaad_yake_samples {
     fn polish_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_pl.txt"),
+            include_str!("samples/test_pl.txt"),
             "pl",
             Config::default(),
             10,
@@ -561,7 +561,7 @@ mod liaad_yake_samples {
     fn turkish_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_tr.txt"),
+            include_str!("samples/test_tr.txt"),
             "tr",
             Config::default(),
             10,
@@ -585,7 +585,7 @@ mod liaad_yake_samples {
     fn arabic_sample_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_ar.txt"),
+            include_str!("samples/test_ar.txt"),
             "ar",
             Config::default(),
             10,
@@ -608,7 +608,7 @@ mod liaad_yake_samples {
     fn dataset_text_1_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_data_1.txt"),
+            include_str!("samples/test_data_1.txt"),
             "pt",
             Config::default(),
             10,
@@ -632,7 +632,7 @@ mod liaad_yake_samples {
     fn dataset_text_2_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_data_2.txt"),
+            include_str!("samples/test_data_2.txt"),
             "en",
             Config::default(),
             5,
@@ -651,7 +651,7 @@ mod liaad_yake_samples {
     fn dataset_text_3_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_data_3.txt"),
+            include_str!("samples/test_data_3.txt"),
             "en",
             Config::default(),
             5,
@@ -670,7 +670,7 @@ mod liaad_yake_samples {
     fn dataset_text_4_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_data_4.txt"),
+            include_str!("samples/test_data_4.txt"),
             "en",
             Config::default(),
             10,
@@ -694,7 +694,7 @@ mod liaad_yake_samples {
     fn dataset_text_5_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_data_5.txt"),
+            include_str!("samples/test_data_5.txt"),
             "en",
             Config::default(),
             10,
@@ -718,7 +718,7 @@ mod liaad_yake_samples {
     fn dataset_text_6_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_data_6.txt"),
+            include_str!("samples/test_data_6.txt"),
             "en",
             Config::default(),
             10,
@@ -742,7 +742,7 @@ mod liaad_yake_samples {
     fn dataset_text_7_defaults() {
         // LIAAD/yake sample text
         test(
-            include_str!("test_data_7.txt"),
+            include_str!("samples/test_data_7.txt"),
             "en",
             Config::default(),
             10,

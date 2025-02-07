@@ -34,7 +34,7 @@ impl Tag {
         word_has_multiple_punctuation_symbols(word, punctuation) || {
             let has_digits = word.chars().any(|w| w.is_ascii_digit());
             let has_alphas = word.chars().any(|w| w.is_alphabetic());
-            (has_alphas && has_digits) || (!has_alphas && !has_digits)
+            has_alphas == has_digits
         }
     }
 }

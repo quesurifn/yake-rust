@@ -17,18 +17,18 @@ use preprocessor::{split_into_sentences, split_into_words};
 use stats::{median, OnlineStats};
 
 use crate::context::Contexts;
-use crate::levenshtein::levenshtein_ratio;
+pub use crate::result_item::*;
 pub use crate::stopwords::StopWords;
 use crate::tag::*;
 
 mod context;
 mod counter;
-mod levenshtein;
 mod plural_helper;
 mod preprocessor;
+mod result_item;
 mod stopwords;
-
 mod tag;
+
 #[cfg(test)]
 mod tests;
 
@@ -76,33 +76,6 @@ struct TermStats {
     sentences: f64,
     /// Importance score. The less, the better
     score: f64,
-}
-
-/// Represents a key phrase.
-#[derive(PartialEq, Clone, Debug)]
-pub struct ResultItem {
-    /// A lowercased key phrase consisting of 1…N words, where N is configured through [`Config::ngrams`].
-    pub keyword: LTerm,
-    /// The first occurrence in the text. Not exact, as words are joined by a single space.
-    pub raw: String,
-    /// Key importance, where 0 is the most important.
-    pub score: f64,
-}
-
-impl PartialEq<(&str, &str, f64)> for ResultItem {
-    fn eq(&self, (raw, key_phrase, score): &(&str, &str, f64)) -> bool {
-        self.raw.eq(raw) && self.keyword.eq(key_phrase) && self.score.eq(score)
-    }
-}
-
-impl From<Candidate<'_>> for ResultItem {
-    fn from(candidate: Candidate) -> Self {
-        ResultItem {
-            raw: candidate.occurrences[0].join(" "),
-            keyword: candidate.lc_terms.join(" "),
-            score: candidate.score,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -204,7 +177,7 @@ impl Yake {
         results.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
 
         if self.config.remove_duplicates {
-            self.remove_duplicates(results, n)
+            remove_duplicates(self.config.deduplication_threshold, results, n)
         } else {
             results.truncate(n);
             results
@@ -221,26 +194,6 @@ impl Yake {
             || self.stop_words.contains(lc_term.to_single())
             // having less than 3 non-punctuation symbols is typical for stop words
             || lc_term.to_single().chars().filter(|ch| !self.config.punctuation.contains(ch)).count() < 3
-    }
-
-    fn remove_duplicates(&self, results: Vec<ResultItem>, n: usize) -> Vec<ResultItem> {
-        let mut unique: Vec<ResultItem> = Vec::new();
-
-        for res in results {
-            if unique.len() >= n {
-                break;
-            }
-
-            let is_duplicate = unique
-                .iter()
-                .any(|it| levenshtein_ratio(&it.keyword, &res.keyword) > self.config.deduplication_threshold);
-
-            if !is_duplicate {
-                unique.push(res);
-            }
-        }
-
-        unique
     }
 
     fn preprocess_text(&self, text: &str) -> Sentences {

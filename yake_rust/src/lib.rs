@@ -264,13 +264,8 @@ impl Yake {
         for (idx, sentence) in sentences.iter().enumerate() {
             let mut window: VecDeque<(&UTerm, Tag)> = VecDeque::with_capacity(self.config.window_size + 1);
 
-            for (w_idx, (((word, term), &is_punctuation), index)) in sentence
-                .words
-                .iter()
-                .zip(&sentence.uq_terms)
-                .zip(&sentence.is_punctuation)
-                .zip(&sentence.uq_terms)
-                .enumerate()
+            for (w_idx, ((word, term), &is_punctuation)) in
+                sentence.words.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation).enumerate()
             {
                 if is_punctuation {
                     window.clear();
@@ -282,7 +277,7 @@ impl Yake {
 
                 let tag = self.get_tag(word, w_idx == 0);
                 let occurrence = Occurrence { idx, word, tag };
-                words.entry(index).or_default().push(occurrence);
+                words.entry(term).or_default().push(occurrence);
 
                 // Do not store in contexts in any way if the word (not the unique term) is tagged "d" or "u"
                 if tag != Tag::Digit && tag != Tag::Unparsable {

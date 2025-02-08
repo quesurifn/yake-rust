@@ -7,10 +7,6 @@ on:
   pull_request:
     branches:
     - master
-  pull_request_target:
-    types: 
-    branches:
-    - master
 
 jobs:
   python-ci:

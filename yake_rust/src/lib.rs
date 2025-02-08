@@ -432,10 +432,6 @@ impl Yake {
                 }
 
                 for k in (j + 1..length + 1).take(n) {
-                    if (j..k).is_empty() {
-                        continue;
-                    }
-
                     let lc_terms = &sentence.lc_terms[j..k];
 
                     if let Entry::Vacant(e) = ignored.entry(lc_terms) {

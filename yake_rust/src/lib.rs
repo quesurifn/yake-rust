@@ -10,7 +10,7 @@
 use std::collections::VecDeque;
 
 use hashbrown::{HashMap, HashSet};
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use itertools::Itertools;
 use plural_helper::PluralHelper;
 use preprocessor::{split_into_sentences, split_into_words};
@@ -302,7 +302,7 @@ impl Yake {
     /// Computes local statistic features that extract informative content within the text
     /// to calculate the importance of single terms.
     fn extract_features<'s>(&self, ctx: &Contexts, words: Words<'s>, sentences: &'s Sentences) -> Features<'s> {
-        let candidate_words: IndexSet<_> = sentences
+        let candidate_words: HashSet<_> = sentences
             .iter()
             .flat_map(|sentence| sentence.lc_terms.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation))
             .filter(|&(_, is_punct)| !is_punct)

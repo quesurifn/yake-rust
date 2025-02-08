@@ -470,7 +470,7 @@ impl Yake {
         let has_non_alphanumeric =
             || self.config.only_alphanumeric_and_hyphen && !lc_terms.iter().all(word_is_alphanumeric_and_hyphen);
 
-        !{ has_float() || has_stop_word() || has_unparsable() || not_enough_symbols() || has_non_alphanumeric() }
+        !{ has_stop_word() || has_float() || has_unparsable() || not_enough_symbols() || has_non_alphanumeric() }
     }
 
     fn ngram_selection<'s>(&self, n: usize, sentences: &'s Sentences) -> Candidates<'s> {

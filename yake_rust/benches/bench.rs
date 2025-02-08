@@ -13,7 +13,7 @@ fn main() {
     divan::main();
 }
 
-#[divan::bench(min_time = 100)]
+#[divan::bench(min_time = 60)]
 fn text_100kb(bencher: Bencher) {
     let text = include_str!("100kb.txt");
     let stopwords = StopWords::predefined("en").unwrap();
@@ -25,7 +25,7 @@ fn text_100kb(bencher: Bencher) {
     });
 }
 
-#[divan::bench(min_time = 100)]
+#[divan::bench(min_time = 60)]
 fn text_3kb(bencher: Bencher) {
     let text = include_str!("3kb.txt");
     let stopwords = StopWords::predefined("en").unwrap();

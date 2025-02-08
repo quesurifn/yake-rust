@@ -220,9 +220,6 @@ impl Yake {
                     window.clear();
                     continue;
                 }
-                if word.is_empty() {
-                    continue;
-                }
 
                 let occurrence = Occurrence { sentence_idx: idx, word, tag };
                 words.entry(term).or_default().push(occurrence);

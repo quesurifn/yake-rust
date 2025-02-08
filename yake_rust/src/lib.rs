@@ -274,7 +274,7 @@ impl Yake {
                     continue;
                 }
 
-                let tag = self.get_tag(word, w_idx == 0);
+                let tag = Tag::from(word, w_idx == 0, &self.config);
                 let occurrence = Occurrence { idx, word, tag };
                 words.entry(term).or_default().push(occurrence);
 
@@ -297,24 +297,6 @@ impl Yake {
         }
 
         (ctx, words)
-    }
-
-    fn is_unparsable(&self, word: &str) -> bool {
-        Tag::is_unparsable(word, &self.config.punctuation)
-    }
-
-    fn get_tag(&self, word: &str, is_first_word_of_sentence: bool) -> Tag {
-        if Tag::is_numeric(word) {
-            Tag::Digit
-        } else if self.is_unparsable(word) {
-            Tag::Unparsable
-        } else if Tag::is_acronym(word) {
-            Tag::Acronym
-        } else if Tag::is_uppercase(self.config.strict_capital, word, is_first_word_of_sentence) {
-            Tag::Uppercase
-        } else {
-            Tag::Parsable
-        }
     }
 
     /// Computes local statistic features that extract informative content within the text
@@ -482,7 +464,7 @@ impl Yake {
     fn is_candidate(&self, lc_terms: &[LTerm]) -> bool {
         let has_float = || lc_terms.iter().any(Tag::is_numeric);
         let has_stop_word = || self.is_stopword(lc_terms.last().unwrap());
-        let has_unparsable = || lc_terms.iter().any(|w| self.is_unparsable(w));
+        let has_unparsable = || lc_terms.iter().any(|w| Tag::is_unparsable(w, &self.config.punctuation));
         let not_enough_symbols =
             || lc_terms.iter().map(|w| w.chars().count()).sum::<usize>() < self.config.minimum_chars;
         let has_non_alphanumeric =

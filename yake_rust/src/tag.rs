@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use crate::Config;
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Tag {
     /// "d"
@@ -15,6 +17,20 @@ pub enum Tag {
 }
 
 impl Tag {
+    pub fn from(word: &str, is_first_word_of_sentence: bool, cfg: &Config) -> Tag {
+        if Tag::is_numeric(word) {
+            Tag::Digit
+        } else if Tag::is_unparsable(word, &cfg.punctuation) {
+            Tag::Unparsable
+        } else if Tag::is_acronym(word) {
+            Tag::Acronym
+        } else if Tag::is_uppercase(cfg.strict_capital, word, is_first_word_of_sentence) {
+            Tag::Uppercase
+        } else {
+            Tag::Parsable
+        }
+    }
+
     pub fn is_numeric(word: impl AsRef<str>) -> bool {
         word.as_ref().replace(",", "").parse::<f64>().is_ok()
     }

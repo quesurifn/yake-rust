@@ -9,6 +9,7 @@
 
 use std::collections::VecDeque;
 
+use hashbrown::hash_set::Entry;
 use hashbrown::{HashMap, HashSet};
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -415,7 +416,7 @@ impl Yake {
         let has_non_alphanumeric =
             || self.config.only_alphanumeric_and_hyphen && !lc_terms.iter().all(word_is_alphanumeric_and_hyphen);
 
-        !{ has_stop_word() || has_bad_tag() || not_enough_symbols() || has_non_alphanumeric() }
+        !{ has_bad_tag() || has_stop_word() || not_enough_symbols() || has_non_alphanumeric() }
     }
 
     fn ngram_selection<'s>(&self, n: usize, sentences: &'s Sentences) -> Candidates<'s> {
@@ -426,6 +427,10 @@ impl Yake {
             let length = sentence.words.len();
 
             for j in 0..length {
+                if self.is_stopword(&sentence.lc_terms[j]) {
+                    continue; // all further n-grams starting with this word can't be candidates
+                }
+
                 for k in (j + 1..length + 1).take(n) {
                     if (j..k).is_empty() {
                         continue;
@@ -433,22 +438,16 @@ impl Yake {
 
                     let lc_terms = &sentence.lc_terms[j..k];
 
-                    if ignored.contains(lc_terms) {
-                        continue;
-                    }
-                    if self.is_stopword(&lc_terms[0]) {
-                        break; // all further n-grams starting with this word can't be candidates
-                    }
-
-                    if !self.is_candidate(lc_terms, &sentence.tags[j..k]) {
-                        ignored.insert(lc_terms);
-                        continue;
-                    }
-
-                    let candidate = candidates.entry(lc_terms).or_default();
-                    candidate.lc_terms = lc_terms;
-                    candidate.occurrences.push(&sentence.words[j..k]);
-                    candidate.uq_terms = &sentence.uq_terms[j..k];
+                    if let Entry::Vacant(e) = ignored.entry(lc_terms) {
+                        if !self.is_candidate(lc_terms, &sentence.tags[j..k]) {
+                            e.insert();
+                        } else {
+                            let candidate = candidates.entry(lc_terms).or_default();
+                            candidate.lc_terms = lc_terms;
+                            candidate.occurrences.push(&sentence.words[j..k]);
+                            candidate.uq_terms = &sentence.uq_terms[j..k];
+                        }
+                    };
                 }
             }
         }

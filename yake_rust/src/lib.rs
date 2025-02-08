@@ -81,9 +81,9 @@ struct TermStats {
 #[derive(Debug, Clone)]
 struct Sentence {
     pub words: Vec<RawString>,
-    pub is_punctuation: Vec<bool>,
     pub lc_terms: Vec<LTerm>,
     pub uq_terms: Vec<UTerm>,
+    pub tags: Vec<Tag>,
 }
 
 /// N-gram, a sequence of N terms.
@@ -201,10 +201,10 @@ impl Yake {
             .into_iter()
             .map(|sentence| {
                 let words = split_into_words(&sentence);
-                let lc_words = words.iter().map(|w| w.to_lowercase()).collect::<Vec<LTerm>>();
-                let uq_terms = lc_words.iter().map(|w| self.get_unique_term(w)).collect();
-                let is_punctuation = words.iter().map(|w| self.word_is_punctuation(w)).collect();
-                Sentence { words, lc_terms: lc_words, uq_terms, is_punctuation }
+                let lc_terms = words.iter().map(|w| w.to_lowercase()).collect::<Vec<LTerm>>();
+                let uq_terms = lc_terms.iter().map(|w| self.get_unique_term(w)).collect();
+                let tags = words.iter().enumerate().map(|(w_idx, w)| Tag::from(w, w_idx == 0, &self.config)).collect();
+                Sentence { words, lc_terms, uq_terms, tags }
             })
             .collect()
     }
@@ -216,10 +216,8 @@ impl Yake {
         for (idx, sentence) in sentences.iter().enumerate() {
             let mut window: VecDeque<(&UTerm, Tag)> = VecDeque::with_capacity(self.config.window_size + 1);
 
-            for (w_idx, ((word, term), &is_punctuation)) in
-                sentence.words.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation).enumerate()
-            {
-                if is_punctuation {
+            for ((word, term), &tag) in sentence.words.iter().zip(&sentence.uq_terms).zip(&sentence.tags) {
+                if tag == Tag::Punctuation {
                     window.clear();
                     continue;
                 }
@@ -227,7 +225,6 @@ impl Yake {
                     continue;
                 }
 
-                let tag = Tag::from(word, w_idx == 0, &self.config);
                 let occurrence = Occurrence { sentence_idx: idx, word, tag };
                 words.entry(term).or_default().push(occurrence);
 
@@ -257,8 +254,8 @@ impl Yake {
     fn extract_features<'s>(&self, ctx: &Contexts, words: Words<'s>, sentences: &'s Sentences) -> Features<'s> {
         let candidate_words: HashSet<_> = sentences
             .iter()
-            .flat_map(|sentence| sentence.lc_terms.iter().zip(&sentence.uq_terms).zip(&sentence.is_punctuation))
-            .filter(|&(_, is_punct)| !is_punct)
+            .flat_map(|sentence| sentence.lc_terms.iter().zip(&sentence.uq_terms).zip(&sentence.tags))
+            .filter(|&(_, &tag)| tag != Tag::Punctuation)
             .map(|p| p.0)
             .collect();
 
@@ -414,16 +411,15 @@ impl Yake {
         }
     }
 
-    fn is_candidate(&self, lc_terms: &[LTerm]) -> bool {
-        let has_float = || lc_terms.iter().any(Tag::is_numeric);
+    fn is_candidate(&self, lc_terms: &[LTerm], tags: &[Tag]) -> bool {
         let has_stop_word = || self.is_stopword(lc_terms.last().unwrap());
-        let has_unparsable = || lc_terms.iter().any(|w| Tag::is_unparsable(w, &self.config.punctuation));
+        let has_bad_tag = || tags.iter().any(|tag| matches!(tag, Tag::Digit | Tag::Punctuation | Tag::Unparsable));
         let not_enough_symbols =
             || lc_terms.iter().map(|w| w.chars().count()).sum::<usize>() < self.config.minimum_chars;
         let has_non_alphanumeric =
             || self.config.only_alphanumeric_and_hyphen && !lc_terms.iter().all(word_is_alphanumeric_and_hyphen);
 
-        !{ has_stop_word() || has_float() || has_unparsable() || not_enough_symbols() || has_non_alphanumeric() }
+        !{ has_stop_word() || has_bad_tag() || not_enough_symbols() || has_non_alphanumeric() }
     }
 
     fn ngram_selection<'s>(&self, n: usize, sentences: &'s Sentences) -> Candidates<'s> {
@@ -449,7 +445,7 @@ impl Yake {
                     }
 
                     // todo: optimize: if some checks have failed, we may skip ngrams, by j += k
-                    if !self.is_candidate(lc_terms) {
+                    if !self.is_candidate(lc_terms, &sentence.tags[j..k]) {
                         ignored.insert(lc_terms);
                         continue;
                     }
@@ -463,10 +459,6 @@ impl Yake {
         }
 
         candidates
-    }
-
-    fn word_is_punctuation(&self, word: impl AsRef<str>) -> bool {
-        word.as_ref().chars().all(|c| self.config.punctuation.contains(&c))
     }
 }
 

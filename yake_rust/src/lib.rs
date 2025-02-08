@@ -189,7 +189,6 @@ impl Yake {
     }
 
     fn is_stopword(&self, lc_term: &LTerm) -> bool {
-        // todo: optimize by iterating the smallest set or with a trie
         self.stop_words.contains(lc_term)
             || self.stop_words.contains(lc_term.to_single())
             // having less than 3 non-punctuation symbols is typical for stop words
@@ -301,7 +300,7 @@ impl Yake {
                 // it is considered. This means that a candidate term that occurs with a capital letter
                 // ten times within ten occurrences will be given a higher value (4.34) than a candidate
                 // term that occurs with a capital letter five times within five occurrences (3.10).
-                stats.casing /= 1.0 + stats.tf.ln(); // todo: no 1+ in the paper
+                stats.casing /= 1.0 + stats.tf.ln();
             }
 
             {
@@ -444,7 +443,6 @@ impl Yake {
                         break; // all further n-grams starting with this word can't be candidates
                     }
 
-                    // todo: optimize: if some checks have failed, we may skip ngrams, by j += k
                     if !self.is_candidate(lc_terms, &sentence.tags[j..k]) {
                         ignored.insert(lc_terms);
                         continue;

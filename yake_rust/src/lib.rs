@@ -49,7 +49,7 @@ type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
 #[derive(PartialEq, Eq, Hash, Debug)]
 struct Occurrence<'sentence> {
     /// Index (0..) of sentence where the term occur
-    pub idx: usize,
+    pub sentence_idx: usize,
     /// The word itself
     pub word: &'sentence RawString,
     pub tag: Tag,
@@ -228,7 +228,7 @@ impl Yake {
                 }
 
                 let tag = Tag::from(word, w_idx == 0, &self.config);
-                let occurrence = Occurrence { idx, word, tag };
+                let occurrence = Occurrence { sentence_idx: idx, word, tag };
                 words.entry(term).or_default().push(occurrence);
 
                 // Do not store in contexts in any way if the word (not the unique term) is tagged "d" or "u"
@@ -327,7 +327,7 @@ impl Yake {
                 // sentences of a text should be more highly valued than terms that appear later. Thus,
                 // instead of considering a uniform distribution of terms, our model assigns higher
                 // scores to terms found in early sentences.
-                let sentence_ids = occurrences.iter().map(|o| o.idx).dedup();
+                let sentence_ids = occurrences.iter().map(|o| o.sentence_idx).dedup();
                 // When the candidate term only appears in the first sentence, the median function
                 // can return a value of 0. To guarantee position > 0, a constant 3 > e=2.71 is added.
                 stats.position = 3.0 + median(sentence_ids).unwrap();
@@ -353,7 +353,7 @@ impl Yake {
             {
                 // Candidates which appear in many different sentences have a higher probability
                 // of being important.
-                let distinct = occurrences.iter().map(|o| o.idx).dedup().count();
+                let distinct = occurrences.iter().map(|o| o.sentence_idx).dedup().count();
                 stats.sentences = distinct as f64 / sentences.len() as f64;
             }
 

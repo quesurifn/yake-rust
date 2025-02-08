@@ -14,7 +14,7 @@ use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use plural_helper::PluralHelper;
 use preprocessor::{split_into_sentences, split_into_words};
-use stats::{mean, median, stddev};
+use stats::{median, OnlineStats};
 
 use crate::context::Contexts;
 use crate::levenshtein::levenshtein_ratio;
@@ -309,7 +309,7 @@ impl Yake {
             .map(|p| p.0)
             .collect();
 
-        let words_nsw: HashMap<&UTerm, usize> = candidate_words
+        let non_stop_words: HashMap<&UTerm, usize> = candidate_words
             .iter()
             .filter(|&(lc, _)| !self.is_stopword(lc))
             .map(|&(_, uq)| {
@@ -318,11 +318,12 @@ impl Yake {
             })
             .collect();
 
-        let tf = words.values().map(Vec::len);
-        let tf_nsw = words_nsw.values().map(|x| *x as f64);
-        let std_tf = stddev(tf_nsw.clone());
-        let mean_tf = mean(tf_nsw);
-        let max_tf = tf.max().unwrap_or(0) as f64;
+        let (nsw_tf_std, nsw_tf_mean) = {
+            let tfs: OnlineStats = non_stop_words.values().map(|&freq| freq as f64).collect();
+            (tfs.stddev(), tfs.mean())
+        };
+
+        let max_tf = words.values().map(Vec::len).max().unwrap_or(0) as f64;
 
         let mut features = Features::new();
 
@@ -388,7 +389,7 @@ impl Yake {
                 // To prevent a bias towards high frequency in long documents, we balance it.
                 // The mean and the standard deviation is calculated from non-stopwords terms,
                 // as stopwords usually have high frequencies.
-                stats.frequency /= mean_tf + std_tf;
+                stats.frequency /= nsw_tf_mean + nsw_tf_std;
             }
 
             {

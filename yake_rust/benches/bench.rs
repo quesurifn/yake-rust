@@ -18,6 +18,7 @@ fn text_100kb(bencher: Bencher) {
     let text = include_str!("100kb.txt");
     let stopwords = StopWords::predefined("en").unwrap();
     let config = Config { remove_duplicates: false, ..Default::default() };
+    segtok::init();
 
     bencher.bench_local(move || {
         black_box(get_n_best(usize::MAX, black_box(text), black_box(&stopwords), black_box(&config)));
@@ -29,6 +30,7 @@ fn text_3kb(bencher: Bencher) {
     let text = include_str!("3kb.txt");
     let stopwords = StopWords::predefined("en").unwrap();
     let config = Config { remove_duplicates: false, ..Default::default() };
+    segtok::init();
 
     bencher.bench_local(move || {
         black_box(get_n_best(usize::MAX, black_box(text), black_box(&stopwords), black_box(&config)));
@@ -42,6 +44,7 @@ fn text_170b(bencher: Bencher) {
             If you need headphones, we've got you covered!";
     let stopwords = StopWords::predefined("en").unwrap();
     let config = Config { remove_duplicates: false, ..Default::default() };
+    segtok::init();
 
     bencher.bench_local(move || {
         black_box(get_n_best(usize::MAX, black_box(text), black_box(&stopwords), black_box(&config)));

@@ -336,11 +336,10 @@ impl Yake {
             };
 
             {
-                let tags: Vec<Tag> = occurrences.iter().map(|occ| occ.tag).collect();
                 // We consider the occurrence of acronyms through a heuristic, where all the letters of the word are capitals.
-                stats.tf_a = tags.iter().filter(|&tag| *tag == Tag::Acronym).count() as f64;
+                stats.tf_a = occurrences.iter().map(|occ| occ.tag).filter(|&tag| tag == Tag::Acronym).count() as f64;
                 // We give extra attention to any term beginning with a capital letter (excluding the beginning of sentences).
-                stats.tf_n = tags.iter().filter(|&tag| *tag == Tag::Uppercase).count() as f64;
+                stats.tf_n = occurrences.iter().map(|occ| occ.tag).filter(|&tag| tag == Tag::Uppercase).count() as f64;
 
                 // The casing aspect of a term is an important feature when considering the extraction
                 // of keywords. The underlying rationale is that uppercase terms tend to be more

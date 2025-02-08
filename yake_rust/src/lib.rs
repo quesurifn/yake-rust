@@ -297,7 +297,7 @@ impl Yake {
                 if window.len() == self.config.window_size {
                     window.pop_front();
                 }
-                window.push_back((term, tag.clone()));
+                window.push_back((term, tag));
             }
         }
 

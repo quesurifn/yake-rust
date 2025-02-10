@@ -133,6 +133,9 @@ show_missing = true
 fail_under = 100
 
 [tool.pytest.ini_options]
-addopts = "--cov='yake_rust' -vv --no-flaky-report"
+addopts = "--cov='yake_rust' -vv --no-flaky-report -m 'not benchmark'"
 minversion = "7.0"
 testpaths = ["tests"]
+markers = [
+  "benchmark",
+]

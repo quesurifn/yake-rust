@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import multiprocessing
+import statistics
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -266,3 +268,58 @@ def test_get_n_best__race_liaad_yake__long_text() -> None:
         window_size=4,  # Make it more demanding
     )
     assert dt_rust < dt_liaad
+
+
+@pytest.mark.benchmark
+def test_compare_benchmark_with_liaad_yake(capsys: pytest.CaptureFixture[str]) -> None:
+    N = 100
+    with open(
+        Path(__file__).parent.parent.parent / "yake_rust" / "benches" / "100kb.txt"
+    ) as filehandle:
+        text = filehandle.read()
+    ngrams = 3
+    nr_of_words = 10
+    window_size = 4
+
+    liaad_extractor = liaad_yake.KeywordExtractor(
+        lan="en",  # default, just making it explicit
+        n=ngrams,
+        dedupFunc="levenshtein",  # value used in yake-rust
+        windowsSize=window_size,
+        top=nr_of_words,
+    )
+    yake_rust_extractor = yake_rust.Yake(
+        ngrams=ngrams,
+        remove_duplicates=True,  # always True for LIAAD/yake
+        window_size=window_size,
+        stopwords=liaad_extractor.stopword_set,  # use LIAAD/yake stopwords
+    )
+
+    dts_liaad: list[float] = []
+    for _ in range(N):
+        t0_liaad = time.perf_counter()
+        _ = liaad_extractor.extract_keywords(text)
+        dt_liaad = time.perf_counter() - t0_liaad
+        dts_liaad.append(dt_liaad)
+    mean_liaad = statistics.mean(dts_liaad)
+    median_liaad = statistics.median(dts_liaad)
+    std_liaad = statistics.stdev(dts_liaad)
+
+    dts_rust: list[float] = []
+    for _ in range(N):
+        t0_rust = time.perf_counter()
+        _ = yake_rust_extractor.get_n_best(text, n=nr_of_words)
+        dt_rust = time.perf_counter() - t0_rust
+        dts_rust.append(dt_rust)
+    mean_rust = statistics.mean(dts_rust)
+    median_rust = statistics.median(dts_rust)
+    std_rust = statistics.stdev(dts_rust)
+
+    with capsys.disabled():
+        print("")
+        print(f"{mean_liaad=:.5}, {median_liaad=:.5}, {std_liaad=:.5}")
+        print(f"{mean_rust=:.5}, {median_rust=:.5}, {std_rust=:.5}")
+        print(
+            f"yake-rust took {mean_rust / mean_liaad:.0%} of the time LIAAD/yake took"
+        )
+        print("")

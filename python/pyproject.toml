@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "yake-rust"
-version = "1.0.0"
+version = "1.0.1"
 description = "Python bindings for the yake-rust crate."
 authors = [
   {name="Anton Vikström"},

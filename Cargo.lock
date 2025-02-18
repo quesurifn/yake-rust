@@ -847,10 +847,11 @@ checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 
 [[package]]
 name = "segtok"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bf17ef41d3a99d46c9b2f74d5562d7558f95160f0468483f63c28d730b09c55"
+checksum = "80ee4d89b4a3f29cd09fc8dd79c26531298035276cdfd0673ec7e543fff32e51"
 dependencies = [
+ "either",
  "fancy-regex",
  "htmlize",
  "itertools",
@@ -1112,7 +1113,7 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 
 [[package]]
 name = "yake-rust"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "divan",
  "hashbrown 0.15.2",

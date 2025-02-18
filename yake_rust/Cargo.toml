@@ -1,6 +1,6 @@
 [package]
 name = "yake-rust"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 
 # https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -57,7 +57,7 @@ zh = []
 regex = "1"
 streaming-stats = "0.2.3"
 hashbrown = "0.15.2"
-segtok = "0.1.4"
+segtok = "0.1.5"
 levenshtein = "1.0.5"
 indexmap = "2.7.0"
 itertools = "0.14.0"

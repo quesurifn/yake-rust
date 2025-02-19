@@ -7,10 +7,10 @@ use crate::{Candidate, LTerm};
 /// Represents a key phrase.
 #[derive(PartialEq, Clone, Debug)]
 pub struct ResultItem {
-    /// A lowercased key phrase consisting of 1…N words, where N is configured through [`Config::ngrams`].
-    pub keyword: LTerm,
     /// The first occurrence in the text. Not exact, as words are joined by a single space.
     pub raw: String,
+    /// A lowercased key phrase consisting of 1…N words, where N is configured through [`Config::ngrams`].
+    pub keyword: LTerm,
     /// Key importance, where 0 is the most important.
     pub score: f64,
 }

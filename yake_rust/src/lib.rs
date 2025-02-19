@@ -397,14 +397,17 @@ impl Yake {
     }
 
     fn is_candidate(&self, lc_terms: &[LTerm], tags: &[Tag]) -> bool {
-        let has_stop_word = || self.is_stopword(lc_terms.last().unwrap());
-        let has_bad_tag = || tags.iter().any(|tag| matches!(tag, Tag::Digit | Tag::Punctuation | Tag::Unparsable));
-        let not_enough_symbols =
-            || lc_terms.iter().map(|w| w.chars().count()).sum::<usize>() < self.config.minimum_chars;
-        let has_non_alphanumeric =
+        let is_bad =
+            // has a bad tag
+            tags.iter().any(|tag| matches!(tag, Tag::Digit | Tag::Punctuation | Tag::Unparsable))
+            // the last word is a stopword
+            || self.is_stopword(lc_terms.last().unwrap())
+            // not enough symbols in total
+            || lc_terms.iter().map(|w| w.chars().count()).sum::<usize>() < self.config.minimum_chars
+            // has non-alphanumeric characters
             || self.config.only_alphanumeric_and_hyphen && !lc_terms.iter().all(word_is_alphanumeric_and_hyphen);
 
-        !{ has_bad_tag() || has_stop_word() || not_enough_symbols() || has_non_alphanumeric() }
+        !is_bad
     }
 
     fn ngram_selection<'s>(&self, n: usize, sentences: &'s Sentences) -> Candidates<'s> {

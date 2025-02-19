@@ -44,7 +44,7 @@ type UTerm = String;
 
 type Sentences = Vec<Sentence>;
 type Candidates<'s> = IndexMap<&'s [LTerm], Candidate<'s>>;
-type Features<'s> = HashMap<&'s UTerm, TermStats>;
+type Features<'s> = HashMap<&'s UTerm, TermScore>;
 type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
@@ -54,6 +54,14 @@ struct Occurrence<'sentence> {
     /// The word itself
     pub word: &'sentence RawString,
     pub tag: Tag,
+}
+
+#[derive(Debug, Default)]
+struct TermScore {
+    /// Term frequency. The total number of occurrences in the text.
+    tf: f64,
+    /// Importance score. The less, the better
+    score: f64,
 }
 
 #[derive(Debug, Default)]
@@ -76,6 +84,12 @@ struct TermStats {
     sentences: f64,
     /// Importance score. The less, the better
     score: f64,
+}
+
+impl From<TermStats> for TermScore {
+    fn from(stats: TermStats) -> Self {
+        Self { tf: stats.tf, score: stats.score }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -349,7 +363,7 @@ impl Yake {
             stats.score = (stats.relatedness * stats.position)
                 / (stats.casing + (stats.frequency / stats.relatedness) + (stats.sentences / stats.relatedness));
 
-            features.insert(u_term, stats);
+            features.insert(u_term, stats.into());
         }
 
         features

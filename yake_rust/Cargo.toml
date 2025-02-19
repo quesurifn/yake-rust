@@ -1,6 +1,6 @@
 [package]
 name = "yake-rust"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 
 # https://doc.rust-lang.org/cargo/reference/manifest.html

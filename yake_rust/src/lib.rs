@@ -44,7 +44,7 @@ type UTerm = String;
 
 type Sentences = Vec<Sentence>;
 type Candidates<'s> = IndexMap<&'s [LTerm], Candidate<'s>>;
-type Features<'s> = HashMap<&'s LTerm, TermStats>;
+type Features<'s> = HashMap<&'s UTerm, TermStats>;
 type Words<'s> = HashMap<&'s UTerm, Vec<Occurrence<'s>>>;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
@@ -58,7 +58,6 @@ struct Occurrence<'sentence> {
 
 #[derive(Debug, Default)]
 struct TermStats {
-    is_stopword: bool,
     /// Term frequency. The total number of occurrences in the text.
     tf: f64,
     /// The number of times this candidate term is marked as an acronym (=all uppercase).
@@ -172,7 +171,7 @@ impl Yake {
         let features = self.extract_features(&context, vocabulary, &sentences);
 
         let mut ngrams: Candidates = self.ngram_selection(self.config.ngrams, &sentences);
-        Yake::candidate_weighting(features, &context, &mut ngrams);
+        self.candidate_weighting(features, &context, &mut ngrams);
 
         let mut results: Vec<ResultItem> = ngrams.into_values().map(Into::into).collect();
         results.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
@@ -249,7 +248,7 @@ impl Yake {
     /// Computes local statistic features that extract informative content within the text
     /// to calculate the importance of single terms.
     fn extract_features<'s>(&self, ctx: &Contexts, words: Words<'s>, sentences: &'s Sentences) -> Features<'s> {
-        let candidate_words: HashSet<_> = sentences
+        let candidate_words: HashMap<_, _> = sentences
             .iter()
             .flat_map(|sentence| sentence.lc_terms.iter().zip(&sentence.uq_terms).zip(&sentence.tags))
             .filter(|&(_, &tag)| tag != Tag::Punctuation)
@@ -259,7 +258,7 @@ impl Yake {
         let non_stop_words: HashMap<&UTerm, usize> = candidate_words
             .iter()
             .filter(|&(lc, _)| !self.is_stopword(lc))
-            .map(|&(_, uq)| {
+            .map(|(_, &uq)| {
                 let occurrences = words.get(uq).unwrap().len();
                 (uq, occurrences)
             })
@@ -274,14 +273,9 @@ impl Yake {
 
         let mut features = Features::new();
 
-        for (lc_term, u_term) in candidate_words {
+        for (_, u_term) in candidate_words {
             let occurrences = words.get(u_term).unwrap();
-
-            let mut stats = TermStats {
-                is_stopword: self.is_stopword(lc_term),
-                tf: occurrences.len() as f64,
-                ..Default::default()
-            };
+            let mut stats = TermStats { tf: occurrences.len() as f64, ..Default::default() };
 
             {
                 // We consider the occurrence of acronyms through a heuristic, where all the letters of the word are capitals.
@@ -354,50 +348,44 @@ impl Yake {
             stats.score = (stats.relatedness * stats.position)
                 / (stats.casing + (stats.frequency / stats.relatedness) + (stats.sentences / stats.relatedness));
 
-            features.insert(lc_term, stats);
+            features.insert(u_term, stats);
         }
 
         features
     }
 
-    fn candidate_weighting<'s>(features: Features<'s>, ctx: &Contexts<'s>, candidates: &mut Candidates<'s>) {
-        for candidate in candidates.values_mut() {
-            let lc_terms = candidate.lc_terms;
+    fn candidate_weighting<'s>(&self, features: Features<'s>, ctx: &Contexts<'s>, candidates: &mut Candidates<'s>) {
+        for (&lc_terms, candidate) in candidates.iter_mut() {
             let uq_terms = candidate.uq_terms;
             {
                 let mut prod_ = 1.0;
                 let mut sum_ = 0.0;
 
                 for (j, (lc, uq)) in lc_terms.iter().zip(uq_terms).enumerate() {
-                    let Some(stats) = features.get(lc) else { continue };
-                    if stats.is_stopword {
-                        let mut prob_prev = 0.0;
-                        let mut prob_succ = 0.0;
-                        if 0 < j {
-                            // Not the first term
-                            // #previous term occurring before this one / #previous term
-                            let prev_uq = uq_terms.get(j - 1).unwrap();
-                            let prev_lc = lc_terms.get(j - 1).unwrap();
-                            prob_prev =
-                                ctx.cases_term_is_followed(prev_uq, uq) as f64 / features.get(&prev_lc).unwrap().tf;
-                        }
-                        if j < uq_terms.len() {
-                            // Not the last term
-                            // #next term occurring after this one / #next term
-                            let next_uq = uq_terms.get(j + 1).unwrap();
-                            let next_lc = lc_terms.get(j + 1).unwrap();
-                            prob_succ =
-                                ctx.cases_term_is_followed(uq, next_uq) as f64 / features.get(&next_lc).unwrap().tf;
-                        }
-
+                    if self.is_stopword(lc) {
+                        let prob_prev = match uq_terms.get(j - 1) {
+                            None => 0.0,
+                            Some(prev_uq) => {
+                                // #previous term occurring before this one / #previous term
+                                ctx.cases_term_is_followed(prev_uq, uq) as f64 / features.get(&prev_uq).unwrap().tf
+                            }
+                        };
+                        let prob_succ = match uq_terms.get(j + 1) {
+                            None => 0.0,
+                            Some(next_uq) => {
+                                // #next term occurring after this one / #next term
+                                ctx.cases_term_is_followed(uq, next_uq) as f64 / features.get(&next_uq).unwrap().tf
+                            }
+                        };
                         let prob = prob_prev * prob_succ;
                         prod_ *= 1.0 + (1.0 - prob);
                         sum_ -= 1.0 - prob;
-                    } else {
+                    } else if let Some(stats) = features.get(uq) {
                         prod_ *= stats.score;
                         sum_ += stats.score;
                     }
                 }
+
                 if sum_ == -1.0 {
                     sum_ = 0.999999999;
                 }

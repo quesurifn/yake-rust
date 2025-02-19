@@ -93,6 +93,9 @@ This Rust crate implements the algorithm described in papers
 the Python package [yake](https://github.com/LIAAD/yake/), originally developed by
 Ricardo Campos, Vitor Mangaravite, Arian Pasquali, Alípio Jorge.
 
-- [Kyle Fahey](https://github.com/quesurifn) — implemented the first draft
-- [Anton Vikström](https://github.com/bunny-therapist) — reached 1-1 score alignment with the original package
-- [Igor Strebz](https://github.com/xamgore) — rewritten and heavily optimized the code
+- [Anton Vikström](https://github.com/bunny-therapist) — maintains the [Python package](https://github.com/quesurifn/yake-rust/tree/master/python#readme)
+  <sup>reached 1-1 score alignment with the original package</sup>
+- [Igor Strebz](https://github.com/xamgore) — maintains the [Rust crate](https://crates.io/crates/yake-rust)\
+  <sup>rewritten and heavily optimized the code (x8-10)</sup>
+- [Kyle Fahey](https://github.com/quesurifn) — repo owner\
+  <sup>implemented the first draft</sup>

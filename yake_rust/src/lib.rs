@@ -357,42 +357,42 @@ impl Yake {
     fn candidate_weighting<'s>(&self, features: Features<'s>, ctx: &Contexts<'s>, candidates: &mut Candidates<'s>) {
         for (&lc_terms, candidate) in candidates.iter_mut() {
             let uq_terms = candidate.uq_terms;
-            {
-                let mut prod_ = 1.0;
-                let mut sum_ = 0.0;
+            let mut prod_ = 1.0;
+            let mut sum_ = 0.0;
 
-                for (j, (lc, uq)) in lc_terms.iter().zip(uq_terms).enumerate() {
-                    if self.is_stopword(lc) {
-                        let prob_prev = match uq_terms.get(j - 1) {
-                            None => 0.0,
-                            Some(prev_uq) => {
-                                // #previous term occurring before this one / #previous term
-                                ctx.cases_term_is_followed(prev_uq, uq) as f64 / features.get(&prev_uq).unwrap().tf
-                            }
-                        };
-                        let prob_succ = match uq_terms.get(j + 1) {
-                            None => 0.0,
-                            Some(next_uq) => {
-                                // #next term occurring after this one / #next term
-                                ctx.cases_term_is_followed(uq, next_uq) as f64 / features.get(&next_uq).unwrap().tf
-                            }
-                        };
-                        let prob = prob_prev * prob_succ;
-                        prod_ *= 1.0 + (1.0 - prob);
-                        sum_ -= 1.0 - prob;
-                    } else if let Some(stats) = features.get(uq) {
-                        prod_ *= stats.score;
-                        sum_ += stats.score;
-                    }
+            for (j, (lc, uq)) in lc_terms.iter().zip(uq_terms).enumerate() {
+                if self.is_stopword(lc) {
+                    let prob_prev = match uq_terms.get(j - 1) {
+                        None => 0.0,
+                        Some(prev_uq) => {
+                            // #previous term occurring before this one / #previous term
+                            ctx.cases_term_is_followed(prev_uq, uq) as f64 / features.get(&prev_uq).unwrap().tf
+                        }
+                    };
+
+                    let prob_succ = match uq_terms.get(j + 1) {
+                        None => 0.0,
+                        Some(next_uq) => {
+                            // #next term occurring after this one / #next term
+                            ctx.cases_term_is_followed(uq, next_uq) as f64 / features.get(&next_uq).unwrap().tf
+                        }
+                    };
+
+                    let prob = prob_prev * prob_succ;
+                    prod_ *= 1.0 + (1.0 - prob);
+                    sum_ -= 1.0 - prob;
+                } else if let Some(stats) = features.get(uq) {
+                    prod_ *= stats.score;
+                    sum_ += stats.score;
                 }
-
-                if sum_ == -1.0 {
-                    sum_ = 0.999999999;
-                }
-
-                let tf = candidate.occurrences.len() as f64;
-                candidate.score = prod_ / (tf * (1.0 + sum_));
             }
+
+            if sum_ == -1.0 {
+                sum_ = 0.999999999;
+            }
+
+            let tf = candidate.occurrences.len() as f64;
+            candidate.score = prod_ / (tf * (1.0 + sum_));
         }
     }
 

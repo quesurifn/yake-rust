@@ -23,11 +23,7 @@ impl PartialEq<(&str, &str, f64)> for ResultItem {
 
 impl From<Candidate<'_>> for ResultItem {
     fn from(candidate: Candidate) -> Self {
-        ResultItem {
-            raw: candidate.occurrences[0].join(" "),
-            keyword: candidate.lc_terms.join(" "),
-            score: candidate.score,
-        }
+        ResultItem { raw: candidate.raw.join(" "), keyword: candidate.lc_terms.join(" "), score: candidate.score }
     }
 }
 

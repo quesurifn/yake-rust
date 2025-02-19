@@ -89,7 +89,8 @@ struct Sentence {
 /// N-gram, a sequence of N terms.
 #[derive(Debug, Default, Clone)]
 struct Candidate<'s> {
-    pub occurrences: Vec<&'s [RawString]>,
+    pub occurrences: usize,
+    pub raw: &'s [RawString],
     pub lc_terms: &'s [LTerm],
     pub uq_terms: &'s [UTerm],
     pub score: f64,
@@ -391,7 +392,7 @@ impl Yake {
                 sum_ = 0.999999999;
             }
 
-            let tf = candidate.occurrences.len() as f64;
+            let tf = candidate.occurrences as f64;
             candidate.score = prod_ / (tf * (1.0 + sum_));
         }
     }
@@ -429,10 +430,15 @@ impl Yake {
                         if !self.is_candidate(lc_terms, &sentence.tags[j..k]) {
                             e.insert();
                         } else {
-                            let candidate = candidates.entry(lc_terms).or_default();
-                            candidate.lc_terms = lc_terms;
-                            candidate.occurrences.push(&sentence.words[j..k]);
-                            candidate.uq_terms = &sentence.uq_terms[j..k];
+                            candidates
+                                .entry(lc_terms)
+                                .or_insert_with(|| Candidate {
+                                    lc_terms,
+                                    uq_terms: &sentence.uq_terms[j..k],
+                                    raw: &sentence.words[j..k],
+                                    ..Default::default()
+                                })
+                                .occurrences += 1;
                         }
                     };
                 }

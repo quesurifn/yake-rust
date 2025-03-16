@@ -23,13 +23,13 @@ impl StopWords {
     ///
     /// The argument is a [ISO 639 two-letter code](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes).
     /// See the [isolang](https://docs.rs/isolang/latest/isolang/index.html) crate.
-    pub fn predefined(lang_iso_639_2: &str) -> Option<Self> {
+    pub fn predefined(lang_iso_639_2: String) -> Option<Self> {
         // https://github.com/LIAAD/yake/tree/0fa58cceb465162b6bd0cab7ec967edeb907fbcc/yake/StopwordsList
         // files were taken from the original repository, with extra modifications:
         // - add extra line at the end
         // - fix encoding, convert to utf8
         // - switch from CRLF to LF
-        let file = match lang_iso_639_2 {
+        let file = match lang_iso_639_2.as_str() {
             #[cfg(feature = "ar")]
             "ar" => include_str!("stopwords/ar.txt"),
             #[cfg(feature = "bg")]

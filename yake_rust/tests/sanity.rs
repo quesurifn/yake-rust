@@ -37,7 +37,7 @@ fn run_through_dataset_files() -> Result<(), Box<dyn std::error::Error>> {
         let filename = format!("{filename}.zip");
         let mut zip = ZipArchive::new(BufReader::new(File::open(filename)?))?;
 
-        let ignored = StopWords::predefined(lang).unwrap();
+        let ignored = StopWords::predefined(lang.to_string()).unwrap();
         let cfg = Config::default();
 
         for idx in 0..zip.len() {
@@ -50,7 +50,7 @@ fn run_through_dataset_files() -> Result<(), Box<dyn std::error::Error>> {
             file.read_to_string(&mut text).unwrap();
 
             let result = std::panic::catch_unwind(|| {
-                let _ = get_n_best(10, &text, &ignored, &cfg);
+                let _ = get_n_best(10, &text, &ignored, cfg.clone());
             });
 
             if result.is_err() {

@@ -3,7 +3,7 @@ use pretty_assertions::assert_eq;
 use super::*;
 
 fn test<const T: usize>(text: &str, lang: &str, cfg: Config, n_best: usize, expected: [(&str, &str, f64); T]) {
-    let stopwords = StopWords::predefined(lang).unwrap();
+    let stopwords = StopWords::predefined(lang.to_string()).unwrap();
     let mut actual = Yake::new(stopwords, cfg).get_n_best(text, n_best);
     // leave only 4 digits
     actual.iter_mut().for_each(|r| r.score = (r.score * 10_000.).round() / 10_000.);

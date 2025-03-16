@@ -33,7 +33,7 @@ impl Yake {
             if stopwords.is_some() {
                 Some(yake_rust::StopWords::custom(stopwords.unwrap()))
             } else {
-                yake_rust::StopWords::predefined(&language.unwrap())
+                yake_rust::StopWords::predefined(language.unwrap())
             }
         };
         let config = yake_rust::Config {
@@ -66,7 +66,7 @@ fn get_n_best_sequential(
     stopwords: &yake_rust::StopWords,
     config: &yake_rust::Config,
 ) -> Vec<(String, f64)> {
-    let results = yake_rust::get_n_best(n, &text, stopwords, config);
+    let results = yake_rust::get_n_best(n, &text, stopwords, config.clone());
     results.iter().map(|r: &yake_rust::ResultItem| (r.raw.to_string(), r.score)).collect::<Vec<_>>()
 }
 

@@ -164,7 +164,7 @@ impl Default for Config {
 /// Extract the top N most important key phrases from the text.
 ///
 /// If you need all the keywords, pass [`usize::MAX`].
-pub fn get_n_best(n: usize, text: &str, stop_words: &StopWords, config: Config) -> Vec<ResultItem> {
+pub fn get_n_best(n: usize, text: &str, stop_words: &StopWords, config: &Config) -> Vec<ResultItem> {
     Yake::new(stop_words.clone(), config.clone()).get_n_best(text, n)
 }
 

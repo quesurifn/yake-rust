@@ -70,9 +70,9 @@ async fn keywords(extract::Json(payload): extract::Json<YakeRequest>) -> Respons
     if payload.ngrams != yake_cfg.ngrams {
         yake_cfg.ngrams = payload.ngrams;
     }
-    let ignored = StopWords::predefined(payload.language).unwrap();
+    let ignored = StopWords::predefined(payload.language.as_str()).unwrap();
 
-    let keywords = get_n_best(payload.num_results, &*payload.body, &ignored, yake_cfg);
+    let keywords = get_n_best(payload.num_results, &*payload.body, &ignored, &yake_cfg);
 
     Json(keywords).into_response()
 }

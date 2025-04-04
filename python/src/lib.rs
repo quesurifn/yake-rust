@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::ops::Deref;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
@@ -57,6 +58,11 @@ impl Yake {
     #[pyo3(signature = (text, *, n))]
     pub fn get_n_best(&self, py: Python, text: &str, n: usize) -> Vec<(String, f64)> {
         py.allow_threads(|| get_n_best_sequential(n, text, &self._stopwords, &self._config))
+    }
+
+    #[getter]
+    fn get_stopwords(&self) -> PyResult<HashSet<String>> {
+        Ok(HashSet::from_iter(self._stopwords.iter().cloned()))
     }
 }
 

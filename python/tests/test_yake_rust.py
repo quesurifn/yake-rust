@@ -31,6 +31,23 @@ def test_instantiate_yake_with_custom_stopwords() -> None:
     _ = yake_rust.Yake(stopwords={"stop", "word"})
 
 
+def test_yake_stopwords_attribute__custom() -> None:
+    stopwords = {"stop", "word"}
+    yake = yake_rust.Yake(stopwords=stopwords)
+    assert yake.stopwords == stopwords
+
+
+def test_yake_stopwords_attribute__language() -> None:
+    yake = yake_rust.Yake(language="en")
+    assert yake.stopwords
+
+
+def test_yake_stopwords_attribute__read_only() -> None:
+    yake = yake_rust.Yake(language="en")
+    with pytest.raises(AttributeError, match="stopwords"):
+        yake.stopwords = set()  # type: ignore[misc]
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [{}, {"language": "en", "stopwords": {"stopwords"}}, {"bad": 1}],

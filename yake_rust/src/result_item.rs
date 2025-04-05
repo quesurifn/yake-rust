@@ -1,11 +1,14 @@
 use std::cmp::max;
 
 use levenshtein::levenshtein;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 use crate::{Candidate, LTerm};
 
 /// Represents a key phrase.
 #[derive(PartialEq, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ResultItem {
     /// The first occurrence in the text. Not exact, as words are joined by a single space.
     pub raw: String,

@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "yake-rust"
-version = "1.2.0"
+version = "1.2.1"
 description = "Python bindings for the yake-rust crate."
 readme = "README.md"
 license = "MIT"

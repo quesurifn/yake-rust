@@ -4,7 +4,6 @@
 #
 #    pip-compile requirements-dev.in
 #
---index-url https://repo.mam.dev/artifactory/api/pypi/pypi-mam/simple
 
 click==8.1.8
     # via yake

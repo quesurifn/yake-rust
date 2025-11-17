@@ -14,11 +14,11 @@ jobs:
     strategy:
       matrix:
         python-version-minor:
-          - '9'
           - '10'
           - '11'
           - '12'
           - '13'
+          - '14'
         platform:
           - runner: ubuntu-latest
             target: x86_64
@@ -56,11 +56,11 @@ jobs:
     strategy:
       matrix:
         python-version-minor:
-          - '9'
           - '10'
           - '11'
           - '12'
           - '13'
+          - '14'
         platform:
           - runner: ubuntu-latest
             target: x86_64
@@ -94,11 +94,11 @@ jobs:
     strategy:
       matrix:
         python-version-minor:
-          - '9'
           - '10'
           - '11'
           - '12'
           - '13'
+          - '14'
         platform:
           - runner: windows-latest
             target: x64

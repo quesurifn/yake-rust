@@ -4,4 +4,5 @@ pytest-integration
 flaky
 mypy
 ruff>=0.1.2
-yake
+yake>=0.6.0
+jellyfish>=1.2.1

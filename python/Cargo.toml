@@ -7,7 +7,7 @@ license = "LICENSE"
 repository = "https://github.com/quesurifn/yake-rust"
 
 [dependencies]
-pyo3 = "0.23.4"
+pyo3 = "0.27.1"
 yake-rust = { path = "../yake_rust" }
 
 [lib]
